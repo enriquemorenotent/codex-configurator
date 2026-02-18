@@ -13,20 +13,110 @@ export const MAX_DETAIL_CHARS = 2200;
 const MAX_ARRAY_PREVIEW_ITEMS = 3;
 const MAX_ARRAY_PREVIEW_CHARS = 52;
 const ROOT_CONFIG_DEFINITIONS = [
+  { key: 'approval_policy', kind: 'value' },
+  { key: 'chatgpt_base_url', kind: 'value' },
+  { key: 'check_for_update_on_startup', kind: 'value' },
+  { key: 'cli_auth_credentials_store', kind: 'value' },
+  { key: 'compact_prompt', kind: 'value' },
+  { key: 'developer_instructions', kind: 'value' },
+  { key: 'disable_paste_burst', kind: 'value' },
+  { key: 'experimental_compact_prompt_file', kind: 'value' },
+  { key: 'experimental_use_freeform_apply_patch', kind: 'value' },
+  { key: 'experimental_use_unified_exec_tool', kind: 'value' },
+  { key: 'file_opener', kind: 'value' },
+  { key: 'forced_chatgpt_workspace_id', kind: 'value' },
+  { key: 'forced_login_method', kind: 'value' },
+  { key: 'hide_agent_reasoning', kind: 'value' },
+  { key: 'include_apply_patch_tool', kind: 'value' },
+  { key: 'instructions', kind: 'value' },
+  { key: 'log_dir', kind: 'value' },
+  { key: 'mcp_oauth_callback_port', kind: 'value' },
+  { key: 'mcp_oauth_credentials_store', kind: 'value' },
   { key: 'model', kind: 'value' },
+  { key: 'model_auto_compact_token_limit', kind: 'value' },
+  { key: 'model_context_window', kind: 'value' },
+  { key: 'model_instructions_file', kind: 'value' },
+  { key: 'model_provider', kind: 'value' },
   { key: 'model_reasoning_effort', kind: 'value' },
   { key: 'model_reasoning_summary', kind: 'value' },
+  { key: 'model_supports_reasoning_summaries', kind: 'value' },
   { key: 'model_verbosity', kind: 'value' },
-  { key: 'approval_policy', kind: 'value' },
-  { key: 'sandbox_mode', kind: 'value' },
-  { key: 'web_search', kind: 'value' },
   { key: 'notify', kind: 'value' },
+  { key: 'oss_provider', kind: 'value' },
   { key: 'personality', kind: 'value' },
+  { key: 'profile', kind: 'value' },
+  { key: 'project_doc_fallback_filenames', kind: 'value' },
+  { key: 'project_doc_max_bytes', kind: 'value' },
+  { key: 'project_root_markers', kind: 'value' },
+  { key: 'review_model', kind: 'value' },
+  { key: 'sandbox_mode', kind: 'value' },
+  { key: 'show_raw_agent_reasoning', kind: 'value' },
+  { key: 'suppress_unstable_features_warning', kind: 'value' },
+  { key: 'tool_output_token_limit', kind: 'value' },
+  { key: 'web_search', kind: 'value' },
+  { key: 'windows_wsl_setup_acknowledged', kind: 'value' },
+  { key: 'agents', kind: 'table' },
+  { key: 'apps', kind: 'table' },
+  { key: 'feedback', kind: 'table' },
   { key: 'features', kind: 'table' },
+  { key: 'history', kind: 'table' },
   { key: 'mcp_servers', kind: 'table' },
+  { key: 'model_providers', kind: 'table' },
+  { key: 'notice', kind: 'table' },
+  { key: 'otel', kind: 'table' },
+  { key: 'profiles', kind: 'table' },
   { key: 'projects', kind: 'table' },
+  { key: 'sandbox_workspace_write', kind: 'table' },
+  { key: 'shell_environment_policy', kind: 'table' },
+  { key: 'skills', kind: 'table' },
+  { key: 'tools', kind: 'table' },
   { key: 'tui', kind: 'table' },
 ];
+const TABLE_CONFIG_DEFINITIONS = {
+  feedback: [
+    { key: 'enabled', kind: 'value' },
+  ],
+  history: [
+    { key: 'max_bytes', kind: 'value' },
+    { key: 'persistence', kind: 'value' },
+  ],
+  notice: [
+    { key: 'hide_full_access_warning', kind: 'value' },
+    { key: 'hide_gpt5_1_migration_prompt', kind: 'value' },
+    { key: 'hide_gpt-5.1-codex-max_migration_prompt', kind: 'value' },
+    { key: 'hide_rate_limit_model_nudge', kind: 'value' },
+    { key: 'hide_world_writable_warning', kind: 'value' },
+    { key: 'model_migrations', kind: 'table' },
+  ],
+  sandbox_workspace_write: [
+    { key: 'network_access', kind: 'value' },
+    { key: 'writable_roots', kind: 'array' },
+    { key: 'exclude_slash_tmp', kind: 'value' },
+    { key: 'exclude_tmpdir_env_var', kind: 'value' },
+  ],
+  shell_environment_policy: [
+    { key: 'inherit', kind: 'value' },
+    { key: 'ignore_default_excludes', kind: 'value' },
+    { key: 'experimental_use_profile', kind: 'value' },
+    { key: 'include_only', kind: 'array' },
+    { key: 'exclude', kind: 'array' },
+    { key: 'set', kind: 'table' },
+  ],
+  skills: [
+    { key: 'config', kind: 'array' },
+  ],
+  tools: [
+    { key: 'web_search', kind: 'value' },
+  ],
+  tui: [
+    { key: 'alternate_screen', kind: 'value' },
+    { key: 'animations', kind: 'value' },
+    { key: 'notification_method', kind: 'value' },
+    { key: 'notifications', kind: 'value' },
+    { key: 'show_tooltips', kind: 'value' },
+    { key: 'status_line', kind: 'array' },
+  ],
+};
 
 export const isPlainObject = (value) =>
   Object.prototype.toString.call(value) === '[object Object]';
@@ -212,7 +302,7 @@ const buildFeatureRows = (node) => {
   })];
 };
 
-const formatMissingRootLabel = (definition) =>
+const formatMissingDefinitionLabel = (definition) =>
   definition.kind === 'table' ? `${definition.key} /` : `${definition.key} = default`;
 
 const formatRowLabel = (key, kind, value) =>
@@ -222,25 +312,33 @@ const formatRowLabel = (key, kind, value) =>
       ? `${key} / [array:${value.length}]`
       : `${key} = ${previewValue(value)}`;
 
-const buildRootRows = (node) => {
+const buildDefinedRows = (node, definitions, pathSegments) => {
   const rows = [];
   const configuredKeys = Object.keys(node);
   const configuredSet = new Set(configuredKeys);
   const seenKeys = new Set();
 
-  ROOT_CONFIG_DEFINITIONS.forEach((definition) => {
+  definitions.forEach((definition) => {
     const isConfigured = configuredSet.has(definition.key);
     seenKeys.add(definition.key);
 
     if (!isConfigured) {
+      const value =
+        definition.kind === 'table'
+          ? {}
+          : definition.kind === 'array'
+            ? []
+            : undefined;
+
       rows.push({
         key: definition.key,
         kind: definition.kind,
-        value: definition.kind === 'table' ? {} : undefined,
+        value,
         pathSegment: definition.key,
-        label: formatMissingRootLabel(definition),
+        label: formatMissingDefinitionLabel(definition),
         preview: 'default',
         isConfigured: false,
+        isDeprecated: isToolsWebSearchDeprecated(pathSegments, definition.key),
       });
       return;
     }
@@ -255,7 +353,7 @@ const buildRootRows = (node) => {
       label: formatRowLabel(definition.key, kind, value),
       preview: previewValue(value),
       isConfigured: true,
-      isDeprecated: isToolsWebSearchDeprecated([], definition.key),
+      isDeprecated: isToolsWebSearchDeprecated(pathSegments, definition.key),
     });
   });
 
@@ -273,10 +371,21 @@ const buildRootRows = (node) => {
         label: formatRowLabel(key, kind, value),
         preview: previewValue(value),
         isConfigured: true,
-        isDeprecated: isToolsWebSearchDeprecated([], key),
+        isDeprecated: isToolsWebSearchDeprecated(pathSegments, key),
       };
     }),
   ];
+};
+
+const buildRootRows = (node) => buildDefinedRows(node, ROOT_CONFIG_DEFINITIONS, []);
+
+const getTableDefinitions = (pathSegments) => {
+  if (!Array.isArray(pathSegments) || pathSegments.length !== 1) {
+    return null;
+  }
+
+  const tableKey = String(pathSegments[0]);
+  return TABLE_CONFIG_DEFINITIONS[tableKey] || null;
 };
 
 const isToolsWebSearchDeprecated = (pathSegments, key) =>
@@ -317,6 +426,11 @@ export const buildRows = (node, pathSegments = []) => {
       return buildFeatureRows({});
     }
 
+    const tableDefinitions = getTableDefinitions(pathSegments);
+    if (tableDefinitions) {
+      return buildDefinedRows({}, tableDefinitions, pathSegments);
+    }
+
     return [];
   }
 
@@ -327,6 +441,11 @@ export const buildRows = (node, pathSegments = []) => {
 
     if (isFeaturesTable(pathSegments)) {
       return buildFeatureRows(node);
+    }
+
+    const tableDefinitions = getTableDefinitions(pathSegments);
+    if (tableDefinitions) {
+      return buildDefinedRows(node, tableDefinitions, pathSegments);
     }
 
     return Object.entries(node).map(([key, value]) => {

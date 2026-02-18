@@ -1,6 +1,11 @@
 import React from 'react';
 import { Text, Box } from 'ink';
-import { getConfigHelp, getConfigOptions, getConfigOptionExplanation } from '../configHelp.js';
+import {
+  getConfigHelp,
+  getConfigOptions,
+  getConfigOptionExplanation,
+  getConfigDefaultOption,
+} from '../configHelp.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 
@@ -73,6 +78,7 @@ const renderArrayDetails = (rows) => {
 const renderEditableOptions = (
   options,
   selectedOptionIndex,
+  defaultOptionIndex,
   optionPathSegments,
   rowKey,
   savedOptionIndex = null,
@@ -83,7 +89,8 @@ const renderEditableOptions = (
     const prefix = showCursor && optionIndex === selectedOptionIndex ? '▶ ' : '  ';
     const valueText = `${prefix}${optionValueText}`;
     const explanation = getConfigOptionExplanation(optionPathSegments, rowKey, option);
-    return { optionIndex, valueText, explanation, optionValueText };
+    const isDefault = optionIndex === defaultOptionIndex;
+    return { optionIndex, valueText, explanation, optionValueText, isDefault };
   });
 
   const valueWidth = optionRows.reduce((max, item) => Math.max(max, item.valueText.length), 0);
@@ -91,7 +98,7 @@ const renderEditableOptions = (
   return React.createElement(
     React.Fragment,
     null,
-    ...optionRows.map(({ optionIndex, valueText, explanation, optionValueText }) =>
+    ...optionRows.map(({ optionIndex, valueText, explanation, optionValueText, isDefault }) =>
       React.createElement(
         Box,
         {
@@ -113,6 +120,9 @@ const renderEditableOptions = (
           ),
           explanation
             ? React.createElement(Text, { color: 'gray' }, `  — ${truncate(explanation, 100)}`)
+            : null,
+          isDefault
+            ? React.createElement(Text, { color: 'cyan' }, '  [default]')
             : null
         ),
         savedOptionIndex === optionIndex
@@ -163,6 +173,15 @@ const formatConfigHelp = (pathSegments, row) => {
     });
   }
 
+  if (pathSegments.length === 0 && row?.key === 'model') {
+    lines.push({
+      text: 'Model values shown here are curated presets and not a full upstream model catalog.',
+      color: 'gray',
+      bold: false,
+      showWarningIcon: false,
+    });
+  }
+
   return lines;
 };
 
@@ -203,9 +222,23 @@ export const ConfigNavigator = ({
       ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
       : [];
   const readOnlyOptionIndex = readOnlyOptions.findIndex((option) => Object.is(option, selectedRow?.value));
+  const readOnlyDefaultOption = selectedRow
+    ? getConfigDefaultOption(selectedPath, selectedRow.key, selectedRow.kind, readOnlyOptions)
+    : null;
+  const readOnlyDefaultOptionIndex = readOnlyOptions.findIndex((option) =>
+    Object.is(option, readOnlyDefaultOption)
+  );
   const shouldShowReadOnlyOptions =
     readOnlyOptions.length > 0 &&
     typeof selectedRow?.value !== 'boolean';
+
+  const editRow = rows[selected] || null;
+  const editDefaultOption = editMode && editRow
+    ? getConfigDefaultOption(editMode.path, editRow.key, 'value', editMode.options)
+    : null;
+  const editDefaultOptionIndex = editMode
+    ? editMode.options.findIndex((option) => Object.is(option, editDefaultOption))
+    : -1;
 
   return React.createElement(
     Box,
@@ -271,6 +304,7 @@ export const ConfigNavigator = ({
               ? renderEditableOptions(
                   editMode.options,
                   editMode.selectedOptionIndex,
+                  editDefaultOptionIndex,
                   editMode.path.slice(0, -1),
                   rows[selected].key,
                   editMode.savedOptionIndex,
@@ -281,7 +315,15 @@ export const ConfigNavigator = ({
                       React.Fragment,
                       null,
                       React.createElement(Text, { color: 'gray' }, ' '),
-                      renderEditableOptions(readOnlyOptions, readOnlyOptionIndex, selectedPath, selectedRow?.key, null, false)
+                      renderEditableOptions(
+                        readOnlyOptions,
+                        readOnlyOptionIndex,
+                        readOnlyDefaultOptionIndex,
+                        selectedPath,
+                        selectedRow?.key,
+                        null,
+                        false
+                      )
                     )
                   : rows[selected].kind === 'array'
                       ? renderArrayDetails(rows[selected].value)

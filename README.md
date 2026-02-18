@@ -36,6 +36,8 @@ codex-configurator
 
 The right-hand pane shows what each setting means, plus a picker when a value has preset options.
 Deprecated settings are marked with a `[!]` warning marker; only that marker is highlighted.
+Model picker entries are curated presets maintained by this project.
+In select lists, `[default]` marks the default option.
 
 ## TOML-aware navigation
 
@@ -45,6 +47,7 @@ The table view follows TOML structure, with a root catalog of common keys:
 - The `features` section remains browsable even when it is not present in the file.
 - Unset feature flags use each feature’s documented default behavior when toggling.
 - Feature rows tagged with `[not in official list]` come from your file but are not in the curated official set.
+- Selected sections such as `history`, `tui`, `feedback`, and `shell_environment_policy` also show common unset keys.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.
