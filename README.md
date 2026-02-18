@@ -57,11 +57,20 @@ If the file is missing or unreadable, the TUI displays the read error and the ex
 
 - `npm start`: run the TUI
 - `npm run dev`: same as `npm start`
-- `npm run lint`: syntax check for `index.js`
+- `npm run lint`: syntax check for all source files
+- `npm run build`: syntax check for distributable entrypoint and modules
 - `npm test`: runs lint
 
 ## Project structure
 
-- `index.js`: application entrypoint and Ink UI
+- `index.js`: application entrypoint, state wiring, and input handling
+- `src/configParser.js`: TOML file parsing, traversal, and row formatting
+- `src/components`: Ink components split by responsibility
+- `src/components/Header.js`: title and tags
+- `src/components/ConfigNavigator.js`: left list and right detail rendering
+- `src/constants.js`: UI copy and labels
+- `src/configHelp.js`: user-facing copy for key explanations
+- `src/layout.js`: pane width and path-key helpers
+- `src/interaction.js`: input helpers
 - `.gitignore`: ignore list for Node/TUI artifacts
 - `package.json`: package metadata and scripts
