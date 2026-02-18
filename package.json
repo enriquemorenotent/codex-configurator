@@ -2,7 +2,7 @@
   "name": "codex-configurator",
   "version": "0.1.0",
   "private": true,
-  "description": "Dummy Ink TUI for Codex Configurator",
+  "description": "TOML-aware Ink TUI for Codex Configurator",
   "main": "index.js",
   "type": "module",
   "keywords": [
@@ -34,6 +34,7 @@
   ],
   "dependencies": {
     "ink": "^6.2.1",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "toml": "^3.0.0"
   }
 }
