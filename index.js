@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import React, { useState, useEffect } from 'react';
+import { execSync } from 'node:child_process';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
 import { CONTROL_HINT, EDIT_CONTROL_HINT } from './src/constants.js';
 import {
@@ -19,6 +20,103 @@ import { ConfigNavigator } from './src/components/ConfigNavigator.js';
 const computeListViewportHeight = (rows, terminalRows) =>
   Math.max(4, Math.min(rows.length, Math.max(4, terminalRows - 14)));
 
+const getCodexVersion = () => {
+  try {
+    const output = execSync('codex --version', { encoding: 'utf8', stdio: 'pipe' }).trim();
+    const firstLine = output.split('\n')[0].trim();
+
+    if (!firstLine) {
+      return 'version unavailable';
+    }
+
+    return firstLine.startsWith('codex') ? firstLine : `version ${firstLine}`;
+  } catch {
+    return 'version unavailable';
+  }
+};
+
+const normalizeVersion = (value) => {
+  const match = String(value || '').match(/(\d+\.\d+\.\d+(?:[-+._][0-9A-Za-z.-]+)*)/);
+  return match ? match[1] : '';
+};
+
+const toVersionParts = (value) =>
+  normalizeVersion(value)
+    .split(/[-+._]/)[0]
+    .split('.')
+    .map((part) => Number.parseInt(part, 10))
+    .filter(Number.isFinite);
+
+const compareVersions = (left, right) => {
+  const leftParts = toVersionParts(left);
+  const rightParts = toVersionParts(right);
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const a = leftParts[index] || 0;
+    const b = rightParts[index] || 0;
+
+    if (a > b) {
+      return 1;
+    }
+
+    if (a < b) {
+      return -1;
+    }
+  }
+
+  return 0;
+};
+
+const getCodexUpdateStatus = () => {
+  const installed = normalizeVersion(getCodexVersion());
+
+  if (!installed) {
+    return {
+      installed: 'version unavailable',
+      latest: 'unknown',
+      status: 'version check unavailable',
+    };
+  }
+
+  try {
+    const latestOutput = execSync('npm view @openai/codex version --json', {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    }).trim();
+    const latest = normalizeVersion(latestOutput) || latestOutput.trim();
+
+    if (!latest) {
+      return {
+        installed,
+        latest: 'unknown',
+        status: 'version check unavailable',
+      };
+    }
+
+    const comparison = compareVersions(installed, latest);
+    if (comparison < 0) {
+      return {
+        installed,
+        latest,
+        status: 'update available',
+      };
+    }
+
+    return {
+      installed,
+      latest,
+      status: 'up to date',
+    };
+  } catch {
+    return {
+      installed,
+      latest: 'unknown',
+      status: 'version check unavailable',
+    };
+  }
+};
+
 const App = () => {
   const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
   const { stdout } = useStdout();
@@ -32,7 +130,16 @@ const App = () => {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [editMode, setEditMode] = useState(null);
   const [editError, setEditError] = useState('');
+  const [codexVersion, setCodexVersion] = useState('version loading...');
+  const [codexVersionStatus, setCodexVersionStatus] = useState('version check unavailable');
   const { exit } = useApp();
+
+  useEffect(() => {
+    setCodexVersion(getCodexVersion());
+    const check = getCodexUpdateStatus();
+    setCodexVersionStatus(check.status);
+    setCodexVersion(check.installed);
+  }, []);
 
   const currentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, pathSegments);
   const rows = buildRows(currentNode);
@@ -273,7 +380,7 @@ const App = () => {
     return React.createElement(
       Box,
       { flexDirection: 'column', padding: 1 },
-      React.createElement(Header),
+      React.createElement(Header, { codexVersion, codexVersionStatus }),
       React.createElement(ConfigNavigator, {
         snapshot,
         pathSegments,
@@ -291,7 +398,7 @@ const App = () => {
   return React.createElement(
     Box,
     { flexDirection: 'column', padding: 1 },
-    React.createElement(Header),
+    React.createElement(Header, { codexVersion, codexVersionStatus }),
     React.createElement(ConfigNavigator, {
       snapshot,
       pathSegments,

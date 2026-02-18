@@ -10,7 +10,7 @@ const WORDMARK = [
   ' ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝     ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝',
 ];
 
-export const Header = () =>
+export const Header = ({ codexVersion, codexVersionStatus }) =>
   React.createElement(
     Box,
     {
@@ -24,5 +24,6 @@ export const Header = () =>
       ...WORDMARK.map((line) =>
         React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${line}` }, line)
       )
-    )
+    ),
+    React.createElement(Text, { color: 'gray' }, `Codex ${codexVersion} (${codexVersionStatus})`)
   );
