@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as toml from 'toml';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
 
 const CONTROL_HINT = '↑/↓ move • Enter: open section • ←/Backspace: back • r: reload • q: quit';
@@ -109,9 +109,6 @@ const previewValue = (value) => {
   return String(value);
 };
 
-const toPathString = (segments) =>
-  segments.length === 0 ? 'root' : ['root', ...segments.map(String)].join(' / ');
-
 const pathToKey = (segments) => JSON.stringify(segments);
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -120,7 +117,7 @@ const computePaneWidths = (terminalWidth, rows) => {
   const available = Math.max(40, terminalWidth - 2);
   const contentRows = rows.length === 0 ? [] : rows;
   const longestRow = contentRows.reduce(
-    (max, row) => Math.max(max, String(row.label).length + 6),
+    (max, row) => Math.max(max, String(row.label).length + 8),
     26
   );
   const minLeftWidth = 30;
@@ -265,7 +262,7 @@ const Header = () =>
     )
   );
 
-const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, terminalWidth }) => {
+const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, scrollOffset, terminalWidth, terminalHeight }) => {
   if (!snapshot.ok) {
     return React.createElement(
       Box,
@@ -280,6 +277,11 @@ const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, terminalWidth 
   const rows = buildRows(currentNode);
   const selected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
   const { leftWidth, rightWidth } = computePaneWidths(terminalWidth, rows);
+  const viewportHeight = Math.max(4, Math.min(rows.length, Math.max(4, (terminalHeight || 24) - 14)));
+  const viewportStart = clamp(scrollOffset, 0, Math.max(0, rows.length - viewportHeight));
+  const visibleRows = rows.slice(viewportStart, viewportStart + viewportHeight);
+  const canScrollUp = viewportStart > 0;
+  const canScrollDown = viewportStart + viewportHeight < rows.length;
 
   return React.createElement(
     Box,
@@ -289,7 +291,7 @@ const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, terminalWidth 
       { flexDirection: 'column', width: leftWidth },
       React.createElement(
         Box,
-      {
+        {
           flexDirection: 'column',
           borderStyle: 'single',
           borderColor: 'gray',
@@ -297,12 +299,16 @@ const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, terminalWidth 
         },
         rows.length === 0
           ? React.createElement(Text, { color: 'gray' }, '[no entries in this table]')
-          : rows.map((row, index) => {
+          : visibleRows.map((row, viewIndex) => {
+              const index = viewportStart + viewIndex;
+              const showTopCue = canScrollUp && viewIndex === 0;
+              const showBottomCue = canScrollDown && viewIndex === visibleRows.length - 1;
               const isSelected = index === selected;
+              const label = `${showTopCue ? '↑ ' : showBottomCue ? '↓ ' : '  '}${isSelected ? '▶' : ' '} ${row.label}`;
               return React.createElement(
                 MenuItem,
                 { isSelected, key: `${row.key}-${index}` },
-                `${isSelected ? '▶' : ' '} ${row.label}`
+                label
               );
             })
       )
@@ -339,26 +345,12 @@ const App = () => {
   const [pathSegments, setPathSegments] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectionByPath, setSelectionByPath] = useState({});
-
-  if (!isInteractive) {
-    return React.createElement(
-      Box,
-      { flexDirection: 'column', padding: 1 },
-      React.createElement(Header),
-      React.createElement(ConfigNavigator, {
-        snapshot,
-        pathSegments,
-        selectedIndex: 0,
-        terminalWidth,
-      }),
-      React.createElement(Text, { color: 'yellow' }, 'Non-interactive mode: input is disabled.')
-    );
-  }
-
+  const [scrollOffset, setScrollOffset] = useState(0);
   const { exit } = useApp();
   const currentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, pathSegments);
   const rows = buildRows(currentNode);
   const safeSelected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
+  const listViewportHeight = Math.max(4, Math.min(rows.length, Math.max(4, (stdout?.rows || 24) - 14)));
   const currentPathKey = pathToKey(pathSegments);
 
   const getSavedIndex = (segments, fallback = 0) => {
@@ -378,12 +370,44 @@ const App = () => {
     }
 
     if (key.upArrow) {
-      setSelectedIndex((previous) => (rows.length === 0 ? 0 : Math.max(previous - 1, 0)));
+      if (rows.length === 0) {
+        return;
+      }
+
+      setSelectedIndex((previous) => {
+        const next = Math.max(previous - 1, 0);
+
+        setScrollOffset((previousScroll) => {
+          if (next < previousScroll) {
+            return next;
+          }
+
+          return clamp(previousScroll, 0, Math.max(0, rows.length - listViewportHeight));
+        });
+
+        return next;
+      });
       return;
     }
 
     if (key.downArrow) {
-      setSelectedIndex((previous) => (rows.length === 0 ? 0 : Math.min(previous + 1, rows.length - 1)));
+      if (rows.length === 0) {
+        return;
+      }
+
+      setSelectedIndex((previous) => {
+        const next = Math.min(previous + 1, rows.length - 1);
+
+        setScrollOffset((previousScroll) => {
+          if (next > previousScroll + listViewportHeight - 1) {
+            return next - listViewportHeight + 1;
+          }
+
+          return clamp(previousScroll, 0, Math.max(0, rows.length - listViewportHeight));
+        });
+
+        return next;
+      });
       return;
     }
 
@@ -392,7 +416,6 @@ const App = () => {
 
       if (target.kind === 'table' || target.kind === 'tableArray') {
         const nextPath = [...pathSegments, target.pathSegment];
-        const nextPathKey = pathToKey(nextPath);
         setPathSegments((previous) => [...previous, target.pathSegment]);
         setSelectionByPath((previous) => ({
           ...previous,
@@ -402,9 +425,16 @@ const App = () => {
         const nextNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, nextPath);
         const nextRows = buildRows(nextNode);
         const savedIndex = getSavedIndex(nextPath, 0);
-        setSelectedIndex(
-          nextRows.length === 0 ? 0 : clamp(savedIndex, 0, nextRows.length - 1)
+        const nextSelected = nextRows.length === 0 ? 0 : clamp(savedIndex, 0, nextRows.length - 1);
+        const nextViewportHeight = Math.max(
+          4,
+          Math.min(
+            nextRows.length,
+            Math.max(4, (stdout?.rows || 24) - 14)
+          )
         );
+        setSelectedIndex(nextSelected);
+        setScrollOffset(clamp(nextSelected, 0, Math.max(0, nextRows.length - nextViewportHeight)));
       }
     }
 
@@ -413,6 +443,7 @@ const App = () => {
       setPathSegments([]);
       setSelectedIndex(0);
       setSelectionByPath({});
+      setScrollOffset(0);
       return;
     }
 
@@ -431,12 +462,38 @@ const App = () => {
         ...previous,
         [currentPathKey]: safeSelected,
       }));
-      setSelectedIndex(
-        parentRows.length === 0 ? 0 : clamp(savedIndex, 0, parentRows.length - 1)
-      );
+      const parentSelected = parentRows.length === 0 ? 0 : clamp(savedIndex, 0, parentRows.length - 1);
+      const parentViewportHeight = Math.max(
+        4,
+        Math.min(parentRows.length, Math.max(4, (stdout?.rows || 24) - 14)
+      ));
+      setSelectedIndex(parentSelected);
+      setScrollOffset(clamp(parentSelected, 0, Math.max(0, parentRows.length - parentViewportHeight)));
       return;
     }
   });
+
+  useEffect(() => {
+    const maxOffset = Math.max(0, rows.length - listViewportHeight);
+    setScrollOffset((previous) => clamp(previous, 0, maxOffset));
+  }, [rows.length, listViewportHeight]);
+
+  if (!isInteractive) {
+    return React.createElement(
+      Box,
+      { flexDirection: 'column', padding: 1 },
+      React.createElement(Header),
+      React.createElement(ConfigNavigator, {
+        snapshot,
+        pathSegments,
+        selectedIndex: 0,
+        terminalWidth,
+        terminalHeight: stdout?.rows || 24,
+        scrollOffset: 0,
+      }),
+      React.createElement(Text, { color: 'yellow' }, 'Non-interactive mode: input is disabled.')
+    );
+  }
 
   return React.createElement(
     Box,
@@ -447,6 +504,8 @@ const App = () => {
       pathSegments,
       selectedIndex: safeSelected,
       terminalWidth,
+      terminalHeight: stdout?.rows || 24,
+      scrollOffset,
     }),
     React.createElement(Text, { color: 'gray' }, CONTROL_HINT)
   );
