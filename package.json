@@ -1,0 +1,39 @@
+{
+  "name": "codex-configurator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dummy Ink TUI for Codex Configurator",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [
+    "tui",
+    "terminal",
+    "cli",
+    "react",
+    "ink",
+    "node",
+    "configurator"
+  ],
+  "author": "Codex Configurator",
+  "license": "MIT",
+  "bin": {
+    "codex-configurator": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "lint": "node --check index.js",
+    "test": "npm run lint",
+    "prepack": "npm run test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js"
+  ],
+  "dependencies": {
+    "ink": "^6.2.1",
+    "react": "^19.0.0"
+  }
+}
