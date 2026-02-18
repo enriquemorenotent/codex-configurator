@@ -171,9 +171,12 @@ const buildFeatureRows = (node) => {
 
   featureKeys.forEach((key) => {
     const isConfigured = configuredSet.has(key);
-    const value = isConfigured ? node[key] : false;
-    const preview = isConfigured ? previewValue(value) : 'default';
     const definition = getConfigFeatureDefinition(key);
+    const defaultValue = typeof definition?.defaultValue === 'boolean'
+      ? definition.defaultValue
+      : false;
+    const value = isConfigured ? node[key] : defaultValue;
+    const preview = isConfigured ? previewValue(value) : 'default';
     const isDeprecated = Boolean(definition?.deprecation);
 
     seenKeys.add(key);

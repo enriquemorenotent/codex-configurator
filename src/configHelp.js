@@ -113,7 +113,7 @@ const CONFIG_VALUE_OPTIONS = {
     'gpt-5.2',
     'gpt-5.1-codex-mini',
   ],
-  model_reasoning_effort: ['low', 'medium', 'high', 'xhigh'],
+  model_reasoning_effort: ['minimal', 'low', 'medium', 'high', 'xhigh'],
   personality: ['pragmatic', 'friendly', 'none'],
   trust_level: ['trusted', 'untrusted'],
   approval_policy: ['untrusted', 'on-request', 'never'],
@@ -143,6 +143,7 @@ const CONFIG_OPTION_EXPLANATIONS = {
     'gpt-5.1-codex-mini': 'Cheaper, faster model with lower capability than flagship options.',
   },
   model_reasoning_effort: {
+    minimal: 'Minimal reasoning for lowest latency and cost.',
     low: 'Fast and direct responses.',
     medium: 'Balanced reasoning for most tasks.',
     high: 'Deeper thinking and richer answers.',

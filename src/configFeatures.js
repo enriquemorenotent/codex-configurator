@@ -8,13 +8,19 @@ const makeFeatureDefinition = (
   key,
   short,
   usage = 'Uses the feature flag value in your config.',
-  deprecation
-) => ({
-  key,
-  short,
-  usage: deprecation ? `[!] ${deprecation}` : usage,
-  deprecation,
-});
+  options = {}
+) => {
+  const deprecation = options?.deprecation;
+  const defaultValue = typeof options?.defaultValue === 'boolean' ? options.defaultValue : false;
+
+  return {
+    key,
+    short,
+    usage: deprecation ? `[!] ${deprecation}` : usage,
+    deprecation,
+    defaultValue,
+  };
+};
 
 export const CONFIG_FEATURE_DEFINITIONS = [
   makeFeatureDefinition('apply_patch_freeform', 'Enable freeform apply_patch style for code edits.', 'When enabled, patch edits can use larger freeform blocks.'),
@@ -26,9 +32,14 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     'collab',
     'Enable collaboration mode helpers.',
     'Turn on multi-party collaboration flow features.',
-    'collab is deprecated; use [features].multi_agent instead.'
+    { deprecation: 'collab is deprecated; use [features].multi_agent instead.' }
   ),
-  makeFeatureDefinition('collaboration_modes', 'Enable multiple collaboration modes.', 'Allow the assistant to switch between interaction modes.'),
+  makeFeatureDefinition(
+    'collaboration_modes',
+    'Enable multiple collaboration modes.',
+    'Allow the assistant to switch between interaction modes.',
+    { defaultValue: true }
+  ),
   makeFeatureDefinition('connectors', 'Enable external connector support.', 'Controls optional third-party connector behavior.'),
   makeFeatureDefinition('elevated_windows_sandbox', 'Enable elevated Windows sandbox.', 'Allows higher-permission sandbox behavior on Windows.'),
   makeFeatureDefinition('enable_experimental_windows_sandbox', 'Enable experimental Windows sandbox.', 'Turns on experimental Windows sandbox behavior.'),
@@ -41,17 +52,37 @@ export const CONFIG_FEATURE_DEFINITIONS = [
   makeFeatureDefinition('js_repl_tools_only', 'Restrict js_repl to tool-only mode.', 'Limits js_repl usage to explicit tool calls.'),
   makeFeatureDefinition('memory_tool', 'Enable memory tool support.', 'Allows Codex to use memory-related workflow tools.'),
   makeFeatureDefinition('multi_agent', 'Enable multi-agent support.', 'Allows multiple coordinated agent contexts.'),
-  makeFeatureDefinition('personality', 'Enable personality controls.', 'Turns on personality-related routing flags.'),
-  makeFeatureDefinition('powershell_utf8', 'Use UTF-8 in PowerShell sessions.', 'Keep PowerShell command output in UTF-8 encoding.'),
+  makeFeatureDefinition(
+    'personality',
+    'Enable personality controls.',
+    'Turns on personality-related routing flags.',
+    { defaultValue: true }
+  ),
+  makeFeatureDefinition(
+    'powershell_utf8',
+    'Use UTF-8 in PowerShell sessions.',
+    'Keep PowerShell command output in UTF-8 encoding.',
+    { defaultValue: true }
+  ),
   makeFeatureDefinition('prevent_idle_sleep', 'Prevent idle sleep while running.', 'Keeps the system awake during active sessions.'),
   makeFeatureDefinition('remote_models', 'Enable remote model discovery.', 'Allows loading model lists from remote model providers.'),
-  makeFeatureDefinition('request_rule', 'Enable request rule controls.', 'Turn on request routing/validation policy behavior.'),
+  makeFeatureDefinition(
+    'request_rule',
+    'Enable request rule controls.',
+    'Turn on request routing/validation policy behavior.',
+    { defaultValue: true }
+  ),
   makeFeatureDefinition('responses_websockets', 'Enable Responses WebSocket transport.', 'Use websocket transport for Responses API calls.'),
   makeFeatureDefinition('responses_websockets_v2', 'Enable Responses WebSocket v2 transport.', 'Use the next-generation websocket transport stack.'),
   makeFeatureDefinition('runtime_metrics', 'Enable runtime metrics collection.', 'Record runtime metrics for analysis and telemetry.'),
   makeFeatureDefinition('search_tool', 'Enable internal search tool.', 'Turns on the built-in search execution tool.'),
   makeFeatureDefinition('shell_snapshot', 'Enable shell snapshots.', 'Capture shell environment state before runs.'),
-  makeFeatureDefinition('shell_tool', 'Enable shell tool access.', 'Allows Codex to run shell commands through the tool interface.'),
+  makeFeatureDefinition(
+    'shell_tool',
+    'Enable shell tool access.',
+    'Allows Codex to run shell commands through the tool interface.',
+    { defaultValue: true }
+  ),
   makeFeatureDefinition('shell_zsh_fork', 'Enable zsh forked shell tool.', 'Runs shell commands through a forked zsh process.'),
   makeFeatureDefinition('skill_env_var_dependency_prompt', 'Enable environment variable prompts for skills.', 'Prompts when skills require missing environment variables.'),
   makeFeatureDefinition('skill_mcp_dependency_install', 'Enable auto install MCP skill dependencies.', 'Installs missing MCP dependencies for skill execution.'),
@@ -64,19 +95,25 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     'web_search',
     'Enable web search tool.',
     'Allows the model to call a web search tool.',
-    '[features].web_search is deprecated; use the top-level web_search setting instead.'
+    { deprecation: '[features].web_search is deprecated; use the top-level web_search setting instead.' }
   ),
   makeFeatureDefinition(
     'web_search_cached',
     'Enable cached web search only.',
     'Restricts web search calls to cached results.',
-    '[features].web_search_cached is deprecated legacy toggle. `true` maps to `web_search = "cached"`.'
+    {
+      deprecation:
+        '[features].web_search_cached is deprecated legacy toggle. `true` maps to `web_search = "cached"`.'
+    }
   ),
   makeFeatureDefinition(
     'web_search_request',
     'Enable web search request flow.',
     'Turns on request-mode web search behavior.',
-    '[features].web_search_request is deprecated legacy toggle. `true` maps to `web_search = "live"`.'
+    {
+      deprecation:
+        '[features].web_search_request is deprecated legacy toggle. `true` maps to `web_search = "live"`.'
+    }
   ),
 ];
 
@@ -96,6 +133,7 @@ export const getConfigFeatureDefinitionOrFallback = (key) => {
     return {
       short: `${prettifyFeatureName(String(key))}`,
       usage: 'Uses a supported feature flag in your Codex config.',
+      defaultValue: false,
     };
   }
 
@@ -104,6 +142,7 @@ export const getConfigFeatureDefinitionOrFallback = (key) => {
       key,
       short: prettifyFeatureName(String(key)),
       usage: 'This is a documented Codex feature flag.',
+      defaultValue: false,
     }
   );
 };
