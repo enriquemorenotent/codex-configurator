@@ -18,12 +18,16 @@ export const Header = ({ codexVersion, codexVersionStatus }) =>
       paddingX: 1,
       marginBottom: 1,
     },
+      React.createElement(
+        Box,
+        { flexDirection: 'column', marginBottom: 1, gap: 0 },
+        ...WORDMARK.map((line) =>
+          React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${line}` }, line)
+        )
+      ),
     React.createElement(
-      Box,
-      { flexDirection: 'column', marginBottom: 1, gap: 0 },
-      ...WORDMARK.map((line) =>
-        React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${line}` }, line)
-      )
-    ),
-    React.createElement(Text, { color: 'gray' }, `Codex ${codexVersion} (${codexVersionStatus})`)
+      Text,
+      { color: 'gray' },
+      codexVersionStatus ? `Codex ${codexVersion} (${codexVersionStatus})` : `Codex ${codexVersion}`
+    )
   );

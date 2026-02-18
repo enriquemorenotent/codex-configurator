@@ -131,14 +131,13 @@ const App = () => {
   const [editMode, setEditMode] = useState(null);
   const [editError, setEditError] = useState('');
   const [codexVersion, setCodexVersion] = useState('version loading...');
-  const [codexVersionStatus, setCodexVersionStatus] = useState('version check unavailable');
+  const [codexVersionStatus, setCodexVersionStatus] = useState('');
   const { exit } = useApp();
 
   useEffect(() => {
-    setCodexVersion(getCodexVersion());
     const check = getCodexUpdateStatus();
-    setCodexVersionStatus(check.status);
     setCodexVersion(check.installed);
+    setCodexVersionStatus(check.status);
   }, []);
 
   const currentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, pathSegments);
