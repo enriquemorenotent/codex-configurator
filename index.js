@@ -103,10 +103,23 @@ const App = () => {
       path: snapshot.path,
       data: nextData,
     });
-    setEditMode({
-      ...editMode,
-      selectedOptionIndex: nextIndex,
-      savedOptionIndex: nextIndex,
+    setEditMode(null);
+    setEditError('');
+  };
+
+  const applyBooleanToggle = (target, targetPath) => {
+    const nextData = setValueAtPath(snapshot.ok ? snapshot.data : {}, targetPath, !target.value);
+    const writeResult = writeConfig(nextData, snapshot.path);
+
+    if (!writeResult.ok) {
+      setEditError(writeResult.error);
+      return;
+    }
+
+    setSnapshot({
+      ok: true,
+      path: snapshot.path,
+      data: nextData,
     });
     setEditError('');
   };
@@ -202,7 +215,13 @@ const App = () => {
       }
 
       const targetPath = [...pathSegments, target.pathSegment];
-      if ((getConfigOptions(targetPath, target.key, target.value, target.kind) || []).length > 0) {
+      const options = getConfigOptions(targetPath, target.key, target.value, target.kind) || [];
+      if (typeof target.value === 'boolean') {
+        applyBooleanToggle(target, targetPath);
+        return;
+      }
+
+      if (options.length > 0) {
         beginEditing(target, targetPath);
       }
       return;

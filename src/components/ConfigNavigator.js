@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, Box } from 'ink';
-import { getConfigHelp, getConfigOptionExplanation } from '../configHelp.js';
+import { getConfigHelp, getConfigOptions, getConfigOptionExplanation } from '../configHelp.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 
@@ -34,7 +34,7 @@ const formatArrayItem = (value) => {
 
 const formatOptionValue = (value) => {
   if (typeof value === 'string') {
-    return JSON.stringify(value);
+    return value;
   }
 
   if (typeof value === 'boolean' || value === null) {
@@ -66,11 +66,13 @@ const renderEditableOptions = (
   selectedOptionIndex,
   optionPathSegments,
   rowKey,
-  savedOptionIndex = null
+  savedOptionIndex = null,
+  showCursor = false
 ) => {
   const optionRows = options.map((option, optionIndex) => {
     const optionValueText = formatOptionValue(option);
-    const valueText = `${optionIndex === selectedOptionIndex ? '▶ ' : '  '}${optionValueText}`;
+    const prefix = showCursor && optionIndex === selectedOptionIndex ? '▶ ' : '  ';
+    const valueText = `${prefix}${optionValueText}`;
     const explanation = getConfigOptionExplanation(optionPathSegments, rowKey, option);
     return { optionIndex, valueText, explanation, optionValueText };
   });
@@ -155,6 +157,19 @@ export const ConfigNavigator = ({
   const visibleRows = rows.slice(viewportStart, viewportStart + viewportHeight);
   const canScrollUp = viewportStart > 0;
   const canScrollDown = viewportStart + viewportHeight < rows.length;
+  const selectedRow = rows[selected] || null;
+  const selectedPath = selectedRow ? [...pathSegments, selectedRow.pathSegment] : pathSegments;
+  const readOnlyOptions =
+    selectedRow && selectedRow.kind === 'value'
+      ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
+      : [];
+  const readOnlyOptionIndex = Math.max(
+    0,
+    readOnlyOptions.findIndex((option) => Object.is(option, selectedRow?.value))
+  );
+  const shouldShowReadOnlyOptions =
+    readOnlyOptions.length > 0 &&
+    typeof selectedRow?.value !== 'boolean';
 
   return React.createElement(
     Box,
@@ -191,13 +206,13 @@ export const ConfigNavigator = ({
         : React.createElement(
             React.Fragment,
             null,
-            ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
-              React.createElement(
-                Text,
-                { key: `help-${selected}-${lineIndex}`, color: 'white' },
-                line
-              )
-            ),
+              ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
+                React.createElement(
+                  Text,
+                  { key: `help-${selected}-${lineIndex}`, color: 'white' },
+                  line
+                )
+              ),
             editError ? React.createElement(Text, { color: 'red' }, editError) : null,
             editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
             editMode
@@ -206,11 +221,19 @@ export const ConfigNavigator = ({
                   editMode.selectedOptionIndex,
                   editMode.path.slice(0, -1),
                   rows[selected].key,
-                  editMode.savedOptionIndex
+                  editMode.savedOptionIndex,
+                  true
                 )
-              : rows[selected].kind === 'array'
-                  ? renderArrayDetails(rows[selected].value)
-                  : null
+              : shouldShowReadOnlyOptions
+                  ? React.createElement(
+                      React.Fragment,
+                      null,
+                      React.createElement(Text, { color: 'gray' }, ' '),
+                      renderEditableOptions(readOnlyOptions, readOnlyOptionIndex, selectedPath, selectedRow?.key, null, false)
+                    )
+                  : rows[selected].kind === 'array'
+                      ? renderArrayDetails(rows[selected].value)
+                      : null
           )
     )
   );

@@ -117,8 +117,16 @@ const CONFIG_PATH_EXPLANATIONS = [
 ];
 
 const CONFIG_VALUE_OPTIONS = {
+  model: [
+    'gpt-5.3-codex',
+    'gpt-5.3-codex-spark',
+    'gpt-5.2-codex',
+    'gpt-5.1-codex-max',
+    'gpt-5.2',
+    'gpt-5.1-codex-mini',
+  ],
   model_reasoning_effort: ['low', 'medium', 'high', 'xhigh'],
-  personality: ['pragmatic', 'concise', 'helpful', 'neutral'],
+  personality: ['pragmatic', 'friendly', 'none'],
   trust_level: ['trusted', 'untrusted', 'ask'],
   approval_policy: ['untrusted', 'on-failure', 'on-request', 'never'],
   sandbox_mode: ['read-only', 'workspace-write', 'danger-full-access'],
@@ -139,6 +147,14 @@ const CONFIG_PATH_OPTIONS = [
 ];
 
 const CONFIG_OPTION_EXPLANATIONS = {
+  model: {
+    'gpt-5.3-codex': 'Default balanced agentic model, tuned for general coding tasks.',
+    'gpt-5.3-codex-spark': 'Fastest model in this set, optimized for quick coding responses.',
+    'gpt-5.2-codex': 'Strong frontier model for deeper code reasoning.',
+    'gpt-5.1-codex-max': 'Flagship Codex model for the deepest, fastest reasoning.',
+    'gpt-5.2': 'Latest frontier model with broad improvements across coding and reasoning.',
+    'gpt-5.1-codex-mini': 'Cheaper, faster model with lower capability than flagship options.',
+  },
   model_reasoning_effort: {
     low: 'Fast and direct responses.',
     medium: 'Balanced reasoning for most tasks.',
@@ -147,9 +163,8 @@ const CONFIG_OPTION_EXPLANATIONS = {
   },
   personality: {
     pragmatic: 'Practical, direct, and concise direction.',
-    concise: 'Shorter responses and fewer details.',
-    helpful: 'Friendly explanations and extra context.',
-    neutral: 'Minimal style, no extra tone.',
+    friendly: 'Warm, explanatory, and approachable responses.',
+    none: 'No personality modifier; keep defaults.',
   },
   trust_level: {
     trusted: 'Runs with normal trust for this path.',
