@@ -61,11 +61,17 @@ const renderArrayDetails = (rows) => {
   );
 };
 
-const renderEditableOptions = (options, selectedOptionIndex, rowKey, savedOptionIndex = null) => {
+const renderEditableOptions = (
+  options,
+  selectedOptionIndex,
+  optionPathSegments,
+  rowKey,
+  savedOptionIndex = null
+) => {
   const optionRows = options.map((option, optionIndex) => {
     const optionValueText = formatOptionValue(option);
     const valueText = `${optionIndex === selectedOptionIndex ? '▶ ' : '  '}${optionValueText}`;
-    const explanation = getConfigOptionExplanation(rowKey, option);
+    const explanation = getConfigOptionExplanation(optionPathSegments, rowKey, option);
     return { optionIndex, valueText, explanation, optionValueText };
   });
 
@@ -106,8 +112,8 @@ const renderEditableOptions = (options, selectedOptionIndex, rowKey, savedOption
   );
 };
 
-const formatConfigHelp = (row) => {
-  const info = getConfigHelp(row.key);
+const formatConfigHelp = (pathSegments, row) => {
+  const info = getConfigHelp(pathSegments, row.key);
   const defaultCollectionText =
     row.kind === 'table' || row.kind === 'tableArray'
       ? 'This section groups related settings.'
@@ -185,7 +191,7 @@ export const ConfigNavigator = ({
         : React.createElement(
             React.Fragment,
             null,
-            ...formatConfigHelp(rows[selected]).map((line, lineIndex) =>
+            ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
               React.createElement(
                 Text,
                 { key: `help-${selected}-${lineIndex}`, color: 'white' },
@@ -198,6 +204,7 @@ export const ConfigNavigator = ({
               ? renderEditableOptions(
                   editMode.options,
                   editMode.selectedOptionIndex,
+                  editMode.path.slice(0, -1),
                   rows[selected].key,
                   editMode.savedOptionIndex
                 )

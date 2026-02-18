@@ -68,15 +68,15 @@ const App = () => {
     });
   };
 
-  const beginEditing = (target) => {
-    const options = getConfigOptions(target.key, target.value, target.kind) || [];
+  const beginEditing = (target, targetPath) => {
+    const options = getConfigOptions(targetPath, target.key, target.value, target.kind) || [];
     if (options.length === 0) {
       return;
     }
 
     setEditError('');
     setEditMode({
-      path: [...pathSegments, target.pathSegment],
+      path: targetPath,
       options,
       selectedOptionIndex: clamp(options.findIndex((option) => Object.is(option, target.value)), 0, options.length - 1),
       savedOptionIndex: null,
@@ -201,8 +201,9 @@ const App = () => {
         return;
       }
 
-      if ((getConfigOptions(target.key, target.value, target.kind) || []).length > 0) {
-        beginEditing(target);
+      const targetPath = [...pathSegments, target.pathSegment];
+      if ((getConfigOptions(targetPath, target.key, target.value, target.kind) || []).length > 0) {
+        beginEditing(target, targetPath);
       }
       return;
     }
@@ -218,7 +219,7 @@ const App = () => {
       return;
     }
 
-    if (key.leftArrow || isBackspaceKey(input, key)) {
+    if (key.leftArrow || isBackspaceKey(input, key) || key.escape) {
       if (pathSegments.length === 0) {
         return;
       }
