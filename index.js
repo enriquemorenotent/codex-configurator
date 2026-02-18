@@ -14,7 +14,7 @@ import {
 } from './src/configParser.js';
 import { getConfigOptions } from './src/configHelp.js';
 import { pathToKey, clamp } from './src/layout.js';
-import { isBackspaceKey } from './src/interaction.js';
+import { isBackspaceKey, isDeleteKey } from './src/interaction.js';
 import { Header } from './src/components/Header.js';
 import { ConfigNavigator } from './src/components/ConfigNavigator.js';
 
@@ -246,6 +246,31 @@ const App = () => {
     setEditError('');
   };
 
+  const unsetValueAtPath = (targetPath) => {
+    const data = snapshot.ok ? snapshot.data : {};
+    const hasConfiguredValue = typeof getNodeAtPath(data, targetPath) !== 'undefined';
+
+    if (!hasConfiguredValue) {
+      setEditError('');
+      return;
+    }
+
+    const nextData = deleteValueAtPath(data, targetPath);
+    const writeResult = writeConfig(nextData, snapshot.path);
+
+    if (!writeResult.ok) {
+      setEditError(writeResult.error);
+      return;
+    }
+
+    setSnapshot({
+      ok: true,
+      path: snapshot.path,
+      data: nextData,
+    });
+    setEditError('');
+  };
+
   useInput((input, key) => {
     if (input === 'q') {
       exit();
@@ -277,6 +302,10 @@ const App = () => {
       if (key.leftArrow || isBackspaceKey(input, key)) {
         setEditMode(null);
         setEditError('');
+        return;
+      }
+
+      if (isDeleteKey(input, key)) {
         return;
       }
 
@@ -346,6 +375,20 @@ const App = () => {
       if (options.length > 0) {
         beginEditing(target, targetPath);
       }
+      return;
+    }
+
+    if (isDeleteKey(input, key) && rows[safeSelected]) {
+      const target = rows[safeSelected];
+      const isValueRow = target.kind === 'value';
+      const isInsideArray = Array.isArray(currentNode);
+
+      if (!isValueRow || isInsideArray) {
+        return;
+      }
+
+      const targetPath = [...pathSegments, target.pathSegment];
+      unsetValueAtPath(targetPath);
       return;
     }
 

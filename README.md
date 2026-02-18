@@ -29,6 +29,7 @@ codex-configurator
 
 - `↑` `↓` : move selection
 - `Enter`: open selected table or open picker for preset values
+- `Del`: unset selected value (remove the key from `config.toml`)
 - `←` / `Backspace`: move up one level (to parent table)
 - `r`: reload `~/.codex/config.toml`
 - `q`: quit
@@ -38,7 +39,10 @@ Deprecated settings are marked with a `[!]` warning marker; only that marker is 
 
 ## TOML-aware navigation
 
-The table view is generated from TOML structure:
+The table view follows TOML structure, with a root catalog of common keys:
+
+- At the root level, common top-level settings are shown even when unset (displayed with `default`).
+- The `features` section remains browsable even when it is not present in the file.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.

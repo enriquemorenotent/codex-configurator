@@ -12,6 +12,21 @@ export const CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
 export const MAX_DETAIL_CHARS = 2200;
 const MAX_ARRAY_PREVIEW_ITEMS = 3;
 const MAX_ARRAY_PREVIEW_CHARS = 52;
+const ROOT_CONFIG_DEFINITIONS = [
+  { key: 'model', kind: 'value' },
+  { key: 'model_reasoning_effort', kind: 'value' },
+  { key: 'model_reasoning_summary', kind: 'value' },
+  { key: 'model_verbosity', kind: 'value' },
+  { key: 'approval_policy', kind: 'value' },
+  { key: 'sandbox_mode', kind: 'value' },
+  { key: 'web_search', kind: 'value' },
+  { key: 'notify', kind: 'value' },
+  { key: 'personality', kind: 'value' },
+  { key: 'features', kind: 'table' },
+  { key: 'mcp_servers', kind: 'table' },
+  { key: 'projects', kind: 'table' },
+  { key: 'tui', kind: 'table' },
+];
 
 export const isPlainObject = (value) =>
   Object.prototype.toString.call(value) === '[object Object]';
@@ -190,6 +205,73 @@ const buildFeatureRows = (node) => {
   })];
 };
 
+const formatMissingRootLabel = (definition) =>
+  definition.kind === 'table' ? `${definition.key} /` : `${definition.key} = default`;
+
+const formatRowLabel = (key, kind, value) =>
+  kind === 'table'
+    ? `${key} /`
+    : kind === 'tableArray'
+      ? `${key} / [array:${value.length}]`
+      : `${key} = ${previewValue(value)}`;
+
+const buildRootRows = (node) => {
+  const rows = [];
+  const configuredKeys = Object.keys(node);
+  const configuredSet = new Set(configuredKeys);
+  const seenKeys = new Set();
+
+  ROOT_CONFIG_DEFINITIONS.forEach((definition) => {
+    const isConfigured = configuredSet.has(definition.key);
+    seenKeys.add(definition.key);
+
+    if (!isConfigured) {
+      rows.push({
+        key: definition.key,
+        kind: definition.kind,
+        value: definition.kind === 'table' ? {} : undefined,
+        pathSegment: definition.key,
+        label: formatMissingRootLabel(definition),
+        preview: 'default',
+        isConfigured: false,
+      });
+      return;
+    }
+
+    const value = node[definition.key];
+    const kind = getNodeKind(value);
+    rows.push({
+      key: definition.key,
+      kind,
+      value,
+      pathSegment: definition.key,
+      label: formatRowLabel(definition.key, kind, value),
+      preview: previewValue(value),
+      isConfigured: true,
+      isDeprecated: isToolsWebSearchDeprecated([], definition.key),
+    });
+  });
+
+  return [
+    ...rows,
+    ...configuredKeys.filter((key) => !seenKeys.has(key)).map((key) => {
+      const value = node[key];
+      const kind = getNodeKind(value);
+
+      return {
+        key,
+        kind,
+        value,
+        pathSegment: key,
+        label: formatRowLabel(key, kind, value),
+        preview: previewValue(value),
+        isConfigured: true,
+        isDeprecated: isToolsWebSearchDeprecated([], key),
+      };
+    }),
+  ];
+};
+
 const isToolsWebSearchDeprecated = (pathSegments, key) =>
   pathSegments[pathSegments.length - 1] === 'tools' && key === 'web_search';
 
@@ -224,29 +306,31 @@ export const getNodeAtPath = (root, segments) => {
 
 export const buildRows = (node, pathSegments = []) => {
   if (node == null) {
+    if (pathSegments.length === 1 && pathSegments[0] === 'features') {
+      return buildFeatureRows({});
+    }
+
     return [];
   }
 
   if (isPlainObject(node)) {
+    if (pathSegments.length === 0) {
+      return buildRootRows(node);
+    }
+
     if (isFeaturesTable(pathSegments)) {
       return buildFeatureRows(node);
     }
 
     return Object.entries(node).map(([key, value]) => {
       const kind = getNodeKind(value);
-      const label =
-        kind === 'table'
-          ? `${key} /`
-          : kind === 'tableArray'
-            ? `${key} / [array:${value.length}]`
-            : `${key} = ${previewValue(value)}`;
 
       return {
         key,
         kind,
         value,
         pathSegment: key,
-        label,
+        label: formatRowLabel(key, kind, value),
         preview: previewValue(value),
         isDeprecated: isToolsWebSearchDeprecated(pathSegments, key),
       };

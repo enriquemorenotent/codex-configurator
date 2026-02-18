@@ -145,6 +145,15 @@ const formatConfigHelp = (pathSegments, row) => {
     });
   }
 
+  if (row?.key === 'approval_policy' && row?.value === 'on-failure') {
+    lines.push({
+      text: 'approval_policy = "on-failure" is deprecated; use "untrusted", "on-request", or "never".',
+      color: 'gray',
+      bold: false,
+      showWarningIcon: true,
+    });
+  }
+
   return lines;
 };
 
@@ -184,10 +193,7 @@ export const ConfigNavigator = ({
     selectedRow && selectedRow.kind === 'value'
       ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
       : [];
-  const readOnlyOptionIndex = Math.max(
-    0,
-    readOnlyOptions.findIndex((option) => Object.is(option, selectedRow?.value))
-  );
+  const readOnlyOptionIndex = readOnlyOptions.findIndex((option) => Object.is(option, selectedRow?.value));
   const shouldShowReadOnlyOptions =
     readOnlyOptions.length > 0 &&
     typeof selectedRow?.value !== 'boolean';

@@ -115,8 +115,8 @@ const CONFIG_VALUE_OPTIONS = {
   ],
   model_reasoning_effort: ['low', 'medium', 'high', 'xhigh'],
   personality: ['pragmatic', 'friendly', 'none'],
-  trust_level: ['trusted', 'untrusted', 'ask'],
-  approval_policy: ['untrusted', 'on-failure', 'on-request', 'never'],
+  trust_level: ['trusted', 'untrusted'],
+  approval_policy: ['untrusted', 'on-request', 'never'],
   sandbox_mode: ['read-only', 'workspace-write', 'danger-full-access'],
   model_reasoning_summary: ['auto', 'concise', 'detailed', 'none'],
   model_verbosity: ['low', 'medium', 'high'],
@@ -125,11 +125,10 @@ const CONFIG_VALUE_OPTIONS = {
 const CONFIG_PATH_OPTIONS = [
   {
     path: ['projects', '*', 'trust_level'],
-    values: ['trusted', 'untrusted', 'ask'],
+    values: ['trusted', 'untrusted'],
     explanations: {
       trusted: 'Runs with normal trust for this project.',
       untrusted: 'Limits risky actions and prompts more often.',
-      ask: 'Requests confirmation before sensitive work.',
     },
   },
 ];
@@ -157,11 +156,9 @@ const CONFIG_OPTION_EXPLANATIONS = {
   trust_level: {
     trusted: 'Runs with normal trust for this path.',
     untrusted: 'Limits risky actions and prompts more often.',
-    ask: 'Requests confirmation before sensitive work.',
   },
   approval_policy: {
     untrusted: 'Requires approval in more situations.',
-    'on-failure': 'Only asks when a command fails.',
     'on-request': 'Requests approval before risky commands.',
     never: 'Tries to proceed without prompts.',
   },
