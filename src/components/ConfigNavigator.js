@@ -7,6 +7,45 @@ import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 const MenuItem = ({ isSelected, children }) =>
   React.createElement(Text, { bold: isSelected, color: isSelected ? 'yellow' : 'white' }, children);
 
+const formatArrayItem = (value) => {
+  if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.length} item(s)]`;
+  }
+
+  if (Object.prototype.toString.call(value) === '[object Object]') {
+    const keys = Object.keys(value);
+    if (keys.length === 0) {
+      return '{}';
+    }
+
+    return `{${keys.join(', ')}}`;
+  }
+
+  return String(value);
+};
+
+const renderArrayDetails = (rows) => {
+  const items = rows.slice(0, 5).map((item, index) =>
+    React.createElement(Text, { key: `array-item-${index}` }, `  ${index + 1}. ${formatArrayItem(item)}`)
+  );
+  const overflow = rows.length - items.length;
+
+  return React.createElement(
+    React.Fragment,
+    null,
+    ...items,
+    overflow > 0 ? React.createElement(Text, { key: 'array-more' }, `  … and ${overflow} more`) : null
+  );
+};
+
 const formatConfigHelp = (row) => {
   const info = getConfigHelp(row.key);
   const defaultCollectionText =
@@ -87,9 +126,11 @@ export const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, scrollO
               ? React.createElement(
                   Text,
                   { key: `value-${selected}`, color: 'white' },
-                  `${formatDetails(rows[selected].value)}`
+                  formatDetails(rows[selected].value)
                 )
-              : null
+              : rows[selected].kind === 'array'
+                ? renderArrayDetails(rows[selected].value)
+                : null
           )
     )
   );

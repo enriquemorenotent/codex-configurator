@@ -5,9 +5,53 @@ import * as toml from 'toml';
 
 export const CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
 export const MAX_DETAIL_CHARS = 2200;
+const MAX_ARRAY_PREVIEW_ITEMS = 3;
+const MAX_ARRAY_PREVIEW_CHARS = 52;
 
 export const isPlainObject = (value) =>
   Object.prototype.toString.call(value) === '[object Object]';
+
+const truncateText = (text, maxLength) =>
+  text.length <= maxLength ? text : `${text.slice(0, Math.max(0, maxLength - 1))}…`;
+
+const formatArrayItemSummary = (value) => {
+  if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.length} item(s)]`;
+  }
+
+  if (isPlainObject(value)) {
+    const keys = Object.keys(value);
+    if (keys.length === 0) {
+      return '{}';
+    }
+
+    const preview = keys.slice(0, 2).join(', ');
+    const suffix = keys.length > 2 ? ', …' : '';
+    return `{${preview}${suffix}}`;
+  }
+
+  return String(value);
+};
+
+const formatArrayPreview = (value) => {
+  if (value.length === 0) {
+    return '[]';
+  }
+
+  const items = value.slice(0, MAX_ARRAY_PREVIEW_ITEMS).map(formatArrayItemSummary);
+  const remaining = value.length - items.length;
+  const joined = `[${items.join(', ')}${remaining > 0 ? `, +${remaining}` : ''}]`;
+
+  return truncateText(joined, MAX_ARRAY_PREVIEW_CHARS);
+};
 
 export const readConfig = () => {
   try {
@@ -54,7 +98,7 @@ const previewValue = (value) => {
   }
 
   if (Array.isArray(value)) {
-    return `[${value.length} item(s)]`;
+    return formatArrayPreview(value);
   }
 
   if (isPlainObject(value)) {
