@@ -154,6 +154,15 @@ const formatConfigHelp = (pathSegments, row) => {
     });
   }
 
+  if (pathSegments?.[pathSegments.length - 1] === 'features' && row?.isDocumented === false) {
+    lines.push({
+      text: 'This key is configured in your file but is not in the official feature list.',
+      color: 'gray',
+      bold: false,
+      showWarningIcon: true,
+    });
+  }
+
   return lines;
 };
 

@@ -12,6 +12,7 @@ const makeFeatureDefinition = (
 ) => {
   const deprecation = options?.deprecation;
   const defaultValue = typeof options?.defaultValue === 'boolean' ? options.defaultValue : false;
+  const isDocumented = options?.isDocumented === true;
 
   return {
     key,
@@ -19,12 +20,18 @@ const makeFeatureDefinition = (
     usage: deprecation ? `[!] ${deprecation}` : usage,
     deprecation,
     defaultValue,
+    isDocumented,
   };
 };
 
 export const CONFIG_FEATURE_DEFINITIONS = [
   makeFeatureDefinition('apply_patch_freeform', 'Enable freeform apply_patch style for code edits.', 'When enabled, patch edits can use larger freeform blocks.'),
-  makeFeatureDefinition('apps', 'Enable built-in app/connector features.', 'Toggle access to app integrations used by Codex.'),
+  makeFeatureDefinition(
+    'apps',
+    'Enable built-in app/connector features.',
+    'Toggle access to app integrations used by Codex.',
+    { isDocumented: true }
+  ),
   makeFeatureDefinition('apps_mcp_gateway', 'Use the MCP app gateway.', 'Route app calls through the MCP gateway when available.'),
   makeFeatureDefinition('child_agents_md', 'Allow child-agent markdown workflows.', 'Enable loading child-agent instructions from markdown files.'),
   makeFeatureDefinition('codex_git_commit', 'Enable Codex-assisted git commit workflows.', 'Allows additional git-oriented agent workflows.'),
@@ -38,7 +45,7 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     'collaboration_modes',
     'Enable multiple collaboration modes.',
     'Allow the assistant to switch between interaction modes.',
-    { defaultValue: true }
+    { defaultValue: true, isDocumented: true }
   ),
   makeFeatureDefinition('connectors', 'Enable external connector support.', 'Controls optional third-party connector behavior.'),
   makeFeatureDefinition('elevated_windows_sandbox', 'Enable elevated Windows sandbox.', 'Allows higher-permission sandbox behavior on Windows.'),
@@ -51,18 +58,23 @@ export const CONFIG_FEATURE_DEFINITIONS = [
   makeFeatureDefinition('js_repl', 'Enable JavaScript REPL.', 'Allow JavaScript-based REPL style tooling.'),
   makeFeatureDefinition('js_repl_tools_only', 'Restrict js_repl to tool-only mode.', 'Limits js_repl usage to explicit tool calls.'),
   makeFeatureDefinition('memory_tool', 'Enable memory tool support.', 'Allows Codex to use memory-related workflow tools.'),
-  makeFeatureDefinition('multi_agent', 'Enable multi-agent support.', 'Allows multiple coordinated agent contexts.'),
+  makeFeatureDefinition(
+    'multi_agent',
+    'Enable multi-agent support.',
+    'Allows multiple coordinated agent contexts.',
+    { isDocumented: true }
+  ),
   makeFeatureDefinition(
     'personality',
     'Enable personality controls.',
     'Turns on personality-related routing flags.',
-    { defaultValue: true }
+    { defaultValue: true, isDocumented: true }
   ),
   makeFeatureDefinition(
     'powershell_utf8',
     'Use UTF-8 in PowerShell sessions.',
     'Keep PowerShell command output in UTF-8 encoding.',
-    { defaultValue: true }
+    { defaultValue: true, isDocumented: true }
   ),
   makeFeatureDefinition('prevent_idle_sleep', 'Prevent idle sleep while running.', 'Keeps the system awake during active sessions.'),
   makeFeatureDefinition('remote_models', 'Enable remote model discovery.', 'Allows loading model lists from remote model providers.'),
@@ -70,7 +82,7 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     'request_rule',
     'Enable request rule controls.',
     'Turn on request routing/validation policy behavior.',
-    { defaultValue: true }
+    { defaultValue: true, isDocumented: true }
   ),
   makeFeatureDefinition('responses_websockets', 'Enable Responses WebSocket transport.', 'Use websocket transport for Responses API calls.'),
   makeFeatureDefinition('responses_websockets_v2', 'Enable Responses WebSocket v2 transport.', 'Use the next-generation websocket transport stack.'),
@@ -81,7 +93,7 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     'shell_tool',
     'Enable shell tool access.',
     'Allows Codex to run shell commands through the tool interface.',
-    { defaultValue: true }
+    { defaultValue: true, isDocumented: true }
   ),
   makeFeatureDefinition('shell_zsh_fork', 'Enable zsh forked shell tool.', 'Runs shell commands through a forked zsh process.'),
   makeFeatureDefinition('skill_env_var_dependency_prompt', 'Enable environment variable prompts for skills.', 'Prompts when skills require missing environment variables.'),
@@ -124,7 +136,9 @@ const FEATURE_DEFINITION_MAP = CONFIG_FEATURE_DEFINITIONS.reduce((acc, definitio
 }, {});
 
 export const getConfigFeatureKeys = () =>
-  CONFIG_FEATURE_DEFINITIONS.map((definition) => definition.key);
+  CONFIG_FEATURE_DEFINITIONS
+    .filter((definition) => definition.isDocumented === true)
+    .map((definition) => definition.key);
 
 export const getConfigFeatureDefinition = (key) => FEATURE_DEFINITION_MAP[key];
 
@@ -134,6 +148,7 @@ export const getConfigFeatureDefinitionOrFallback = (key) => {
       short: `${prettifyFeatureName(String(key))}`,
       usage: 'Uses a supported feature flag in your Codex config.',
       defaultValue: false,
+      isDocumented: false,
     };
   }
 
@@ -141,8 +156,9 @@ export const getConfigFeatureDefinitionOrFallback = (key) => {
     FEATURE_DEFINITION_MAP[key] || {
       key,
       short: prettifyFeatureName(String(key)),
-      usage: 'This is a documented Codex feature flag.',
+      usage: 'This configured key is not in the official feature list.',
       defaultValue: false,
+      isDocumented: false,
     }
   );
 };

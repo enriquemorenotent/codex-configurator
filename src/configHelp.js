@@ -25,6 +25,10 @@ export const CONFIG_KEY_EXPLANATIONS = {
     short: 'Defines how much file and command control Codex has.',
     usage: 'Use a stronger mode for convenience, a safer mode for routine browsing.',
   },
+  web_search: {
+    short: 'Controls whether Codex can use web search and what source mode it uses.',
+    usage: 'Use disabled to block web search, cached for cached-only, or live for fresh results.',
+  },
   notify: {
     short: 'Runs commands on your machine when Codex sends a notification.',
     usage: 'Use this to trigger a sound, popup, or log whenever Codex completes work.',
@@ -118,6 +122,7 @@ const CONFIG_VALUE_OPTIONS = {
   trust_level: ['trusted', 'untrusted'],
   approval_policy: ['untrusted', 'on-request', 'never'],
   sandbox_mode: ['read-only', 'workspace-write', 'danger-full-access'],
+  web_search: ['disabled', 'cached', 'live'],
   model_reasoning_summary: ['auto', 'concise', 'detailed', 'none'],
   model_verbosity: ['low', 'medium', 'high'],
 };
@@ -167,6 +172,11 @@ const CONFIG_OPTION_EXPLANATIONS = {
     'read-only': 'Read-only filesystem and safer command behavior.',
     'workspace-write': 'Allows edits only in current workspace.',
     'danger-full-access': 'Permits broader file and command access.',
+  },
+  web_search: {
+    disabled: 'Disables web search tool usage.',
+    cached: 'Allows only cached web search results.',
+    live: 'Allows live web search results from the network.',
   },
   model_reasoning_summary: {
     auto: 'Adaptive summary verbosity.',

@@ -44,6 +44,7 @@ The table view follows TOML structure, with a root catalog of common keys:
 - At the root level, common top-level settings are shown even when unset (displayed with `default`).
 - The `features` section remains browsable even when it is not present in the file.
 - Unset feature flags use each feature’s documented default behavior when toggling.
+- Feature rows tagged with `[not in official list]` come from your file but are not in the curated official set.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.

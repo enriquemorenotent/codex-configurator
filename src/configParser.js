@@ -189,21 +189,25 @@ const buildFeatureRows = (node) => {
       preview,
       isConfigured,
       isDeprecated,
+      isDocumented: true,
     });
   });
 
   return [...rows, ...configuredKeys.filter((key) => !seenKeys.has(key)).map((key) => {
     const value = node[key];
     const preview = previewValue(value);
+    const definition = getConfigFeatureDefinition(key);
 
     return {
       key,
       kind: getNodeKind(value),
       value,
       pathSegment: key,
-      label: `${key} = ${preview}`,
+      label: `${key} = ${preview} [not in official list]`,
       preview,
       isConfigured: true,
+      isDeprecated: Boolean(definition?.deprecation),
+      isDocumented: false,
     };
   })];
 };
