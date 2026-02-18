@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as toml from 'toml';
+import { stringify } from '@iarna/toml';
 
 export const CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
 export const MAX_DETAIL_CHARS = 2200;
@@ -13,6 +14,19 @@ export const isPlainObject = (value) =>
 
 const truncateText = (text, maxLength) =>
   text.length <= maxLength ? text : `${text.slice(0, Math.max(0, maxLength - 1))}…`;
+
+const resolveSegment = (segment) => {
+  if (typeof segment === 'number') {
+    return segment;
+  }
+
+  if (typeof segment === 'string' && /^\d+$/.test(segment)) {
+    const parsed = Number(segment);
+    return Number.isInteger(parsed) ? parsed : segment;
+  }
+
+  return segment;
+};
 
 const formatArrayItemSummary = (value) => {
   if (typeof value === 'string') {
@@ -72,6 +86,24 @@ export const readConfig = () => {
   }
 };
 
+const normalizeFilePath = (outputPath) => outputPath || CONFIG_PATH;
+
+export const writeConfig = (data, outputPath = CONFIG_PATH) => {
+  try {
+    const payload = stringify(data);
+    fs.writeFileSync(normalizeFilePath(outputPath), `${payload}\n`);
+
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || 'Unable to write configuration file.',
+    };
+  }
+};
+
 const getNodeKind = (value) => {
   if (isPlainObject(value)) {
     return 'table';
@@ -116,8 +148,10 @@ export const getNodeAtPath = (root, segments) => {
       return undefined;
     }
 
-    if (Array.isArray(current) && Number.isInteger(segment)) {
-      current = current[segment];
+    const normalizedSegment = resolveSegment(segment);
+
+    if (Array.isArray(current) && Number.isInteger(normalizedSegment)) {
+      current = current[normalizedSegment];
       continue;
     }
 
@@ -125,8 +159,8 @@ export const getNodeAtPath = (root, segments) => {
       return undefined;
     }
 
-    if (typeof current === 'object' && segment in current) {
-      current = current[segment];
+    if (typeof current === 'object' && normalizedSegment in current) {
+      current = current[normalizedSegment];
     } else {
       return undefined;
     }
@@ -191,6 +225,32 @@ export const formatDetails = (value) => {
   }
 
   return String(value);
+};
+
+export const setValueAtPath = (root, segments, nextValue) => {
+  if (!root || segments.length === 0) {
+    return root;
+  }
+
+  const copy = isPlainObject(root) ? { ...root } : Array.isArray(root) ? [...root] : root;
+  let current = copy;
+
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const segment = resolveSegment(segments[index]);
+    const next = current?.[segment];
+    const nextContainer = isPlainObject(next)
+      ? { ...next }
+      : Array.isArray(next)
+        ? [...next]
+        : {};
+    current[segment] = nextContainer;
+    current = nextContainer;
+  }
+
+  const lastSegment = resolveSegment(segments[segments.length - 1]);
+  current[lastSegment] = nextValue;
+
+  return copy;
 };
 
 export const getTableKind = (node) => getNodeKind(node);

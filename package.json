@@ -35,6 +35,7 @@
     "src"
   ],
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "ink": "^6.2.1",
     "react": "^19.0.0",
     "toml": "^3.0.0"

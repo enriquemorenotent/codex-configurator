@@ -28,12 +28,12 @@ codex-configurator
 ## Controls
 
 - `↑` `↓` : move selection
-- `Enter`: enter selected table (for section/object/array-of-tables)
+- `Enter`: open selected table or open picker for preset values
 - `←` / `Backspace`: move up one level (to parent table)
 - `r`: reload `~/.codex/config.toml`
 - `q`: quit
 
-The right-hand pane shows type and rendered contents for the selected TOML node.
+The right-hand pane shows what each setting means, plus a picker when a value has preset options.
 
 ## TOML-aware navigation
 

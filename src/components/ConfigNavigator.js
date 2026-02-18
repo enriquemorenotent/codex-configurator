@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, Box } from 'ink';
-import { getConfigHelp } from '../configHelp.js';
+import { getConfigHelp, getConfigOptionExplanation } from '../configHelp.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 
@@ -32,6 +32,21 @@ const formatArrayItem = (value) => {
   return String(value);
 };
 
+const formatOptionValue = (value) => {
+  if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value === 'boolean' || value === null) {
+    return String(value);
+  }
+
+  return String(value);
+};
+
+const truncate = (text, maxLength) =>
+  text.length <= maxLength ? text : `${text.slice(0, Math.max(0, maxLength - 1))}…`;
+
 const renderArrayDetails = (rows) => {
   const items = rows.slice(0, 5).map((item, index) =>
     React.createElement(Text, { key: `array-item-${index}` }, `  ${index + 1}. ${formatArrayItem(item)}`)
@@ -43,6 +58,51 @@ const renderArrayDetails = (rows) => {
     null,
     ...items,
     overflow > 0 ? React.createElement(Text, { key: 'array-more' }, `  … and ${overflow} more`) : null
+  );
+};
+
+const renderEditableOptions = (options, selectedOptionIndex, rowKey, savedOptionIndex = null) => {
+  const optionRows = options.map((option, optionIndex) => {
+    const optionValueText = formatOptionValue(option);
+    const valueText = `${optionIndex === selectedOptionIndex ? '▶ ' : '  '}${optionValueText}`;
+    const explanation = getConfigOptionExplanation(rowKey, option);
+    return { optionIndex, valueText, explanation, optionValueText };
+  });
+
+  const valueWidth = optionRows.reduce((max, item) => Math.max(max, item.valueText.length), 0);
+
+  return React.createElement(
+    React.Fragment,
+    null,
+    ...optionRows.map(({ optionIndex, valueText, explanation, optionValueText }) =>
+      React.createElement(
+        Box,
+        {
+          key: `option-${rowKey}-${optionIndex}`,
+          flexDirection: 'column',
+        },
+        React.createElement(
+          Box,
+          {
+            flexDirection: 'row',
+          },
+          React.createElement(
+            Text,
+            {
+              color: optionIndex === selectedOptionIndex ? 'yellow' : 'white',
+              bold: optionIndex === selectedOptionIndex,
+            },
+            `${valueText.padEnd(valueWidth, ' ')}`
+          ),
+          explanation
+            ? React.createElement(Text, { color: 'gray' }, `  — ${truncate(explanation, 100)}`)
+            : null
+        ),
+        savedOptionIndex === optionIndex
+          ? React.createElement(Text, { color: 'green' }, `  Saved: ${optionValueText}`)
+          : null
+      )
+    )
   );
 };
 
@@ -60,7 +120,16 @@ const formatConfigHelp = (row) => {
   return usage ? [short, usage] : [short];
 };
 
-export const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, scrollOffset, terminalWidth, terminalHeight }) => {
+export const ConfigNavigator = ({
+  snapshot,
+  pathSegments,
+  selectedIndex,
+  scrollOffset,
+  terminalWidth,
+  terminalHeight,
+  editMode,
+  editError,
+}) => {
   if (!snapshot.ok) {
     return React.createElement(
       Box,
@@ -95,14 +164,15 @@ export const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, scrollO
           borderColor: 'gray',
           padding: 1,
         },
-      rows.length === 0
-        ? React.createElement(Text, { color: 'gray' }, '[no entries in this table]')
-        : visibleRows.map((row, viewIndex) => {
-            const index = viewportStart + viewIndex;
-            const showTopCue = canScrollUp && viewIndex === 0;
-            const showBottomCue = canScrollDown && viewIndex === visibleRows.length - 1;
-            const isSelected = index === selected;
-            const label = `${showTopCue ? '↑ ' : showBottomCue ? '↓ ' : '  '}${isSelected ? '▶' : ' '} ${row.label}`;
+        rows.length === 0
+          ? React.createElement(Text, { color: 'gray' }, '[no entries in this table]')
+          : visibleRows.map((row, viewIndex) => {
+              const index = viewportStart + viewIndex;
+              const showTopCue = canScrollUp && viewIndex === 0;
+              const showBottomCue = canScrollDown && viewIndex === visibleRows.length - 1;
+              const isSelected = index === selected;
+              const label = `${showTopCue ? '↑ ' : showBottomCue ? '↓ ' : '  '}${isSelected ? '▶' : ' '} ${row.label}`;
+
               return React.createElement(MenuItem, { isSelected, key: `left-${index}` }, label);
             })
       )
@@ -122,15 +192,18 @@ export const ConfigNavigator = ({ snapshot, pathSegments, selectedIndex, scrollO
                 line
               )
             ),
-            rows[selected].kind === 'value'
-              ? React.createElement(
-                  Text,
-                  { key: `value-${selected}`, color: 'white' },
-                  formatDetails(rows[selected].value)
+            editError ? React.createElement(Text, { color: 'red' }, editError) : null,
+            editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
+            editMode
+              ? renderEditableOptions(
+                  editMode.options,
+                  editMode.selectedOptionIndex,
+                  rows[selected].key,
+                  editMode.savedOptionIndex
                 )
               : rows[selected].kind === 'array'
-                ? renderArrayDetails(rows[selected].value)
-                : null
+                  ? renderArrayDetails(rows[selected].value)
+                  : null
           )
     )
   );
