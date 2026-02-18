@@ -1,3 +1,5 @@
+import { getConfigFeatureDefinitionOrFallback } from './configFeatures.js';
+
 export const CONFIG_KEY_EXPLANATIONS = {
   model: {
     short: 'This is the model that powers Codex responses.',
@@ -55,26 +57,6 @@ export const CONFIG_KEY_EXPLANATIONS = {
 
 const CONFIG_PATH_EXPLANATIONS = [
   {
-    path: ['features', 'rmcp_client'],
-    short: 'Enable RMCP integration for external tools and workflows.',
-    usage: 'Turn it off to keep tool calls strictly local to this CLI.',
-  },
-  {
-    path: ['features', 'unified_exec'],
-    short: 'Let Codex treat command execution through one unified flow.',
-    usage: 'Disable for stricter separation of execution environments.',
-  },
-  {
-    path: ['features', 'shell_snapshot'],
-    short: 'Capture shell context before running a command.',
-    usage: 'Disable only if you want faster startup for very short commands.',
-  },
-  {
-    path: ['features', 'steer'],
-    short: 'Allow interactive route-control for ambiguous steps.',
-    usage: 'Turn off if you prefer fully automatic execution flow.',
-  },
-  {
     path: ['features', 'apps'],
     short: 'Enable helper app integrations used by the Codex CLI.',
     usage: 'Disable if you want the CLI to run with fewer external integrations.',
@@ -83,6 +65,12 @@ const CONFIG_PATH_EXPLANATIONS = [
     path: ['features', 'multi_agent'],
     short: 'Allow multiple background agent helpers to coordinate.',
     usage: 'Disable for a simple single-agent flow.',
+  },
+  {
+    path: ['tools', 'web_search'],
+    short: 'Deprecated legacy web search flag.',
+    usage: 'Use the top-level web_search setting instead.',
+    deprecation: 'tools.web_search is deprecated; use the top-level web_search setting instead.',
   },
   {
     path: ['projects', '*', 'trust_level'],
@@ -215,6 +203,9 @@ const getContextEntry = (segments, key, candidates) => {
 
 export const getConfigHelp = (segments, key) =>
   getContextEntry(segments, key, CONFIG_PATH_EXPLANATIONS) ||
+  (segments?.[segments.length - 1] === 'features'
+    ? getConfigFeatureDefinitionOrFallback(key)
+    : null) ||
   CONFIG_KEY_EXPLANATIONS[key] ||
   null;
 

@@ -8,6 +8,7 @@ import {
   readConfig,
   getNodeAtPath,
   buildRows,
+  deleteValueAtPath,
   setValueAtPath,
   writeConfig,
 } from './src/configParser.js';
@@ -18,7 +19,7 @@ import { Header } from './src/components/Header.js';
 import { ConfigNavigator } from './src/components/ConfigNavigator.js';
 
 const computeListViewportHeight = (rows, terminalRows) =>
-  Math.max(4, Math.min(rows.length, Math.max(4, terminalRows - 14)));
+  Math.max(4, Math.min(rows.length, Math.min(20, Math.max(4, terminalRows - 14))));
 
 const getCodexVersion = () => {
   try {
@@ -141,7 +142,7 @@ const App = () => {
   }, []);
 
   const currentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, pathSegments);
-  const rows = buildRows(currentNode);
+  const rows = buildRows(currentNode, pathSegments);
   const safeSelected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
   const listViewportHeight = computeListViewportHeight(rows, terminalHeight);
   const currentPathKey = pathToKey(pathSegments);
@@ -214,7 +215,22 @@ const App = () => {
   };
 
   const applyBooleanToggle = (target, targetPath) => {
-    const nextData = setValueAtPath(snapshot.ok ? snapshot.data : {}, targetPath, !target.value);
+    const shouldUseDefault = target?.isConfigured === false;
+    const isFeatureBoolean =
+      targetPath.length >= 2 &&
+      targetPath[targetPath.length - 2] === 'features';
+
+    let nextValue = !target.value;
+    if (isFeatureBoolean && target.value === false && !shouldUseDefault) {
+      nextValue = null;
+    }
+
+    const data = snapshot.ok ? snapshot.data : {};
+    const nextData =
+      nextValue === null
+        ? deleteValueAtPath(data, targetPath)
+        : setValueAtPath(data, targetPath, nextValue);
+
     const writeResult = writeConfig(nextData, snapshot.path);
 
     if (!writeResult.ok) {
@@ -310,7 +326,7 @@ const App = () => {
         }));
 
         const nextNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, nextPath);
-        const nextRows = buildRows(nextNode);
+        const nextRows = buildRows(nextNode, nextPath);
         const nextViewportHeight = computeListViewportHeight(nextRows, terminalHeight);
         const nextSavedIndex = getSavedIndex(nextPath, 0);
         const nextSelected = nextRows.length === 0 ? 0 : clamp(nextSavedIndex, 0, nextRows.length - 1);
@@ -351,7 +367,7 @@ const App = () => {
 
       const parentPath = pathSegments.slice(0, -1);
       const parentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, parentPath);
-      const parentRows = buildRows(parentNode);
+      const parentRows = buildRows(parentNode, parentPath);
       const savedIndex = getSavedIndex(parentPath, 0);
 
       setPathSegments(parentPath);

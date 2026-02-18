@@ -4,8 +4,17 @@ import { getConfigHelp, getConfigOptions, getConfigOptionExplanation } from '../
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 
-const MenuItem = ({ isSelected, children }) =>
-  React.createElement(Text, { bold: isSelected, color: isSelected ? 'yellow' : 'white' }, children);
+const MenuItem = ({ isSelected, isDimmed, isDeprecated, label }) =>
+  React.createElement(
+    Text,
+    {
+      bold: isSelected,
+      color: isSelected ? 'yellow' : isDimmed ? 'gray' : 'white',
+      dimColor: !isSelected && isDimmed,
+    },
+    label,
+    isDeprecated ? React.createElement(Text, { color: 'yellow' }, ' [!]') : null
+  );
 
 const formatArrayItem = (value) => {
   if (typeof value === 'string') {
@@ -124,8 +133,19 @@ const formatConfigHelp = (pathSegments, row) => {
         : 'This setting affects Codex behavior.';
   const short = info?.short || defaultCollectionText;
   const usage = info?.usage;
+  const isWarning = Boolean(info?.deprecation);
+  const lines = [{ text: short, color: 'white', bold: false, showWarningIcon: false }];
 
-  return usage ? [short, usage] : [short];
+  if (usage) {
+    lines.push({
+      text: isWarning ? usage.replace(/^\[!\]\s*/, '') : usage,
+      color: 'gray',
+      bold: false,
+      showWarningIcon: isWarning,
+    });
+  }
+
+  return lines;
 };
 
 export const ConfigNavigator = ({
@@ -149,10 +169,11 @@ export const ConfigNavigator = ({
   }
 
   const currentNode = getNodeAtPath(snapshot.data, pathSegments);
-  const rows = buildRows(currentNode);
+  const rows = buildRows(currentNode, pathSegments);
   const selected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
   const { leftWidth, rightWidth } = computePaneWidths(terminalWidth, rows);
-  const viewportHeight = Math.max(4, Math.min(rows.length, Math.max(4, (terminalHeight || 24) - 14)));
+  const terminalListHeight = Math.max(4, (terminalHeight || 24) - 14);
+  const viewportHeight = Math.max(4, Math.min(rows.length, Math.min(20, terminalListHeight)));
   const viewportStart = clamp(scrollOffset, 0, Math.max(0, rows.length - viewportHeight));
   const visibleRows = rows.slice(viewportStart, viewportStart + viewportHeight);
   const canScrollUp = viewportStart > 0;
@@ -194,7 +215,16 @@ export const ConfigNavigator = ({
               const isSelected = index === selected;
               const label = `${showTopCue ? '↑ ' : showBottomCue ? '↓ ' : '  '}${isSelected ? '▶' : ' '} ${row.label}`;
 
-              return React.createElement(MenuItem, { isSelected, key: `left-${index}` }, label);
+              return React.createElement(
+                MenuItem,
+                {
+                  label,
+                  isSelected,
+                  isDimmed: !isSelected && row.isConfigured === false,
+                  isDeprecated: row.isDeprecated,
+                  key: `left-${index}`,
+                }
+              );
             })
       )
     ),
@@ -209,8 +239,15 @@ export const ConfigNavigator = ({
               ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
                 React.createElement(
                   Text,
-                  { key: `help-${selected}-${lineIndex}`, color: 'white' },
-                  line
+                  {
+                    key: `help-${selected}-${lineIndex}`,
+                    color: line.color,
+                    bold: line.bold,
+                  },
+                  line.showWarningIcon
+                    ? React.createElement(Text, { color: 'yellow' }, '[!] ')
+                    : null,
+                  line.text
                 )
               ),
             editError ? React.createElement(Text, { color: 'red' }, editError) : null,

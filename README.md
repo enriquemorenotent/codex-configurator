@@ -34,6 +34,7 @@ codex-configurator
 - `q`: quit
 
 The right-hand pane shows what each setting means, plus a picker when a value has preset options.
+Deprecated settings are marked with a `[!]` warning marker; only that marker is highlighted.
 
 ## TOML-aware navigation
 
@@ -52,6 +53,10 @@ The app reads from:
 ```
 
 If the file is missing or unreadable, the TUI displays the read error and the expected path.
+
+## Upstream reference
+
+- Codex configuration reference: https://developers.openai.com/codex/config-reference/
 
 ## Scripts
 
