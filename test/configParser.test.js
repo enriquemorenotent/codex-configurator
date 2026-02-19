@@ -142,20 +142,17 @@ test('writeConfig writes atomically to an existing file path', () => {
   }
 });
 
-test('writeConfig fails when the target file does not exist', () => {
+test('writeConfig creates missing parent directories and target file', () => {
   withTempErrorLogPath(({ tempDirectory, logPath }) => {
-    const configPath = path.join(tempDirectory, 'missing.toml');
+    const configPath = path.join(tempDirectory, 'nested', 'config.toml');
     const result = writeConfig({ model: 'gpt-5' }, configPath);
 
-    assert.equal(result.ok, false);
-    assert.match(result.error, /does not exist/);
-    assert.deepEqual(fs.readdirSync(tempDirectory), ['errors.log']);
+    assert.equal(result.ok, true);
+    assert.equal(fs.existsSync(configPath), true);
 
-    const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n');
-    assert.equal(lines.length, 1);
-    const entry = JSON.parse(lines[0]);
-    assert.equal(entry.event, 'config.write.failed');
-    assert.equal(entry.configPath, configPath);
-    assert.match(entry.error, /does not exist/);
+    const fileContents = fs.readFileSync(configPath, 'utf8');
+    const parsed = toml.parse(fileContents);
+    assert.equal(parsed.model, 'gpt-5');
+    assert.equal(fs.existsSync(logPath), false);
   });
 });

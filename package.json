@@ -22,7 +22,7 @@
 		"start": "node index.js",
 		"dev": "node index.js",
 		"lint": "node --check index.js src/*.js src/components/*.js",
-		"build": "npm run lint",
+		"build": "npm pack --dry-run --ignore-scripts --cache .npm-cache",
 		"test": "node --test",
 		"prepack": "npm run lint && npm test"
 	},

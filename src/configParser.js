@@ -115,16 +115,8 @@ export const writeConfig = (data, outputPath = CONFIG_PATH) => {
   );
 
   try {
-    if (!fs.existsSync(targetPath)) {
-      logConfiguratorError('config.write.failed', {
-        configPath: targetPath,
-        error: `Configuration file does not exist: ${targetPath}`,
-      });
-
-      return {
-        ok: false,
-        error: `Configuration file does not exist: ${targetPath}`,
-      };
+    if (!fs.existsSync(directoryPath)) {
+      fs.mkdirSync(directoryPath, { recursive: true, mode: 0o700 });
     }
 
     const payload = stringify(data);

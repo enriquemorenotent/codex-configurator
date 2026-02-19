@@ -69,7 +69,7 @@ The app reads from:
 ```
 
 If the file is missing or unreadable, the TUI displays the read error and the expected path.
-Configuration writes are atomic and only apply to existing config files.
+Configuration writes are atomic and create `~/.codex/config.toml` (and parent directories) when missing.
 Read/write failures are also appended to `~/.codex-configurator-errors.log`.
 
 ## Upstream reference
@@ -81,12 +81,15 @@ Read/write failures are also appended to `~/.codex-configurator-errors.log`.
 - `npm start`: run the TUI
 - `npm run dev`: same as `npm start`
 - `npm run lint`: syntax check for all source files
-- `npm run build`: runs lint
+- `npm run build`: validates the npm package archive (`npm pack --dry-run --ignore-scripts --cache .npm-cache`)
 - `npm test`: runs the Node.js unit test suite (`node --test`)
 
 ## Continuous integration
 
-GitHub Actions runs `npm run lint`, `npm test`, and `npm run build` on every push and pull request.
+GitHub Actions runs `npm run lint`, `npm test`, `npm run build`, and `npm pack --dry-run` on every push and pull request across:
+
+- `ubuntu-latest`, `macos-latest`, and `windows-latest`
+- Node.js `18` and `20`
 
 ## Project structure
 

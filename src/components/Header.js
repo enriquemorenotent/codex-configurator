@@ -21,8 +21,8 @@ export const Header = ({ codexVersion, codexVersionStatus }) =>
       React.createElement(
         Box,
         { flexDirection: 'column', marginBottom: 1, gap: 0 },
-        ...WORDMARK.map((line) =>
-          React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${line}` }, line)
+        ...WORDMARK.map((line, index) =>
+          React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${index}` }, line)
         )
       ),
     React.createElement(

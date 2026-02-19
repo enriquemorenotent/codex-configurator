@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import React, { useState, useEffect } from 'react';
-import { execSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
 import { CONTROL_HINT, EDIT_CONTROL_HINT } from './src/constants.js';
 import {
@@ -56,20 +56,39 @@ const isCustomIdTableRow = (pathSegments, row) =>
   Boolean(getReferenceCustomIdPlaceholder(pathSegments));
 
 const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
+const VERSION_COMMAND_TIMEOUT_MS = 3000;
 
-const getCodexVersion = () => {
-  try {
-    const output = execSync('codex --version', { encoding: 'utf8', stdio: 'pipe' }).trim();
-    const firstLine = output.split('\n')[0].trim();
+const runCommand = (command, args = []) =>
+  new Promise((resolve) => {
+    execFile(
+      command,
+      args,
+      {
+        encoding: 'utf8',
+        timeout: VERSION_COMMAND_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      },
+      (error, stdout) => {
+        if (error) {
+          resolve('');
+          return;
+        }
 
-    if (!firstLine) {
-      return 'version unavailable';
-    }
+        resolve(String(stdout || '').trim());
+      }
+    );
+  });
 
-    return firstLine.startsWith('codex') ? firstLine : `version ${firstLine}`;
-  } catch {
+const getCodexVersion = async () => {
+  const output = await runCommand('codex', ['--version']);
+  const firstLine = output.split('\n')[0]?.trim();
+
+  if (!firstLine) {
     return 'version unavailable';
   }
+
+  return firstLine.startsWith('codex') ? firstLine : `version ${firstLine}`;
 };
 
 const normalizeVersion = (value) => {
@@ -105,53 +124,43 @@ const compareVersions = (left, right) => {
   return 0;
 };
 
-const getCodexUpdateStatus = () => {
-  const installed = normalizeVersion(getCodexVersion());
+const getCodexUpdateStatus = async () => {
+  const installedLabel = await getCodexVersion();
+  const installed = normalizeVersion(installedLabel);
 
   if (!installed) {
     return {
-      installed: 'version unavailable',
+      installed: installedLabel,
       latest: 'unknown',
       status: 'version check unavailable',
     };
   }
 
-  try {
-    const latestOutput = execSync('npm view @openai/codex version --json', {
-      encoding: 'utf8',
-      stdio: 'pipe',
-    }).trim();
-    const latest = normalizeVersion(latestOutput) || latestOutput.trim();
+  const latestOutput = await runCommand('npm', ['view', '@openai/codex', 'version', '--json']);
+  const latest = normalizeVersion(latestOutput) || latestOutput.trim();
 
-    if (!latest) {
-      return {
-        installed,
-        latest: 'unknown',
-        status: 'version check unavailable',
-      };
-    }
+  if (!latest) {
+    return {
+      installed,
+      latest: 'unknown',
+      status: 'version check unavailable',
+    };
+  }
 
-    const comparison = compareVersions(installed, latest);
-    if (comparison < 0) {
-      return {
-        installed,
-        latest,
-        status: 'update available',
-      };
-    }
-
+  const comparison = compareVersions(installed, latest);
+  if (comparison < 0) {
     return {
       installed,
       latest,
-      status: 'up to date',
-    };
-  } catch {
-    return {
-      installed,
-      latest: 'unknown',
-      status: 'version check unavailable',
+      status: 'update available',
     };
   }
+
+  return {
+    installed,
+    latest,
+    status: 'up to date',
+  };
 };
 
 const App = () => {
@@ -172,9 +181,24 @@ const App = () => {
   const { exit } = useApp();
 
   useEffect(() => {
-    const check = getCodexUpdateStatus();
-    setCodexVersion(check.installed);
-    setCodexVersionStatus(check.status);
+    let isCancelled = false;
+
+    const loadVersionStatus = async () => {
+      const check = await getCodexUpdateStatus();
+
+      if (isCancelled) {
+        return;
+      }
+
+      setCodexVersion(check.installed);
+      setCodexVersionStatus(check.status);
+    };
+
+    loadVersionStatus();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const currentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, pathSegments);
@@ -705,7 +729,7 @@ const App = () => {
       setEditError('');
       return;
     }
-  });
+  }, { isActive: isInteractive });
 
   useEffect(() => {
     const maxOffset = Math.max(0, rows.length - listViewportHeight);

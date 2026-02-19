@@ -5,6 +5,7 @@ build/
 coverage/
 
 .npm/
+.npm-cache/
 .yarn/
 .cache/
 .turbo/
