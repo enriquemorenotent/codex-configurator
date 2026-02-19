@@ -61,30 +61,42 @@ const isCustomIdTableRow = (pathSegments, row) =>
 
 const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
 const VERSION_COMMAND_TIMEOUT_MS = 3000;
+const UPDATE_COMMAND_TIMEOUT_MS = 180000;
+const COMMAND_MAX_BUFFER_BYTES = 1024 * 1024;
+const UPDATE_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const CODEX_BIN_ENV_VAR = 'CODEX_CONFIGURATOR_CODEX_BIN';
 const NPM_BIN_ENV_VAR = 'CODEX_CONFIGURATOR_NPM_BIN';
+const CONFIGURATOR_PACKAGE_NAME = 'codex-configurator';
 
-const runCommand = (command, args = []) =>
+const runCommandWithResult = (command, args = [], options = {}) =>
   new Promise((resolve) => {
     execFile(
       command,
       args,
       {
         encoding: 'utf8',
-        timeout: VERSION_COMMAND_TIMEOUT_MS,
-        maxBuffer: 1024 * 1024,
+        timeout: options.timeout || VERSION_COMMAND_TIMEOUT_MS,
+        maxBuffer: options.maxBuffer || COMMAND_MAX_BUFFER_BYTES,
         windowsHide: true,
       },
-      (error, stdout) => {
-        if (error) {
-          resolve('');
-          return;
-        }
-
-        resolve(String(stdout || '').trim());
+      (error, stdout, stderr) => {
+        resolve({
+          ok: !error,
+          stdout: String(stdout || '').trim(),
+          stderr: String(stderr || '').trim(),
+        });
       }
     );
   });
+
+const runCommand = async (command, args = [], options = {}) => {
+  const result = await runCommandWithResult(command, args, options);
+  if (!result.ok) {
+    return '';
+  }
+
+  return result.stdout;
+};
 
 const getConfiguredCommand = (environmentVariableName, fallbackCommand) => {
   const configuredCommand = String(process.env[environmentVariableName] || '').trim();
@@ -95,6 +107,24 @@ const getVersionCommands = () => ({
   codexCommand: getConfiguredCommand(CODEX_BIN_ENV_VAR, 'codex'),
   npmCommand: getConfiguredCommand(NPM_BIN_ENV_VAR, 'npm'),
 });
+
+const getLatestPackageVersion = async (npmCommand, packageName) => {
+  const latestOutput = await runCommand(npmCommand, ['view', packageName, 'version', '--json']);
+  return normalizeVersion(latestOutput) || latestOutput.trim();
+};
+
+const updateGlobalPackageToLatest = async (npmCommand, packageName) => {
+  const result = await runCommandWithResult(
+    npmCommand,
+    ['install', '-g', `${packageName}@latest`],
+    {
+      timeout: UPDATE_COMMAND_TIMEOUT_MS,
+      maxBuffer: UPDATE_MAX_BUFFER_BYTES,
+    }
+  );
+
+  return result.ok;
+};
 
 const getCodexVersion = async (codexCommand) => {
   const output = await runCommand(codexCommand, ['--version']);
@@ -185,6 +215,24 @@ const getCodexUpdateStatus = async () => {
   };
 };
 
+const ensureLatestConfiguratorVersion = async (npmCommand) => {
+  const installed = normalizeVersion(PACKAGE_VERSION);
+  if (!installed) {
+    return;
+  }
+
+  const latest = await getLatestPackageVersion(npmCommand, CONFIGURATOR_PACKAGE_NAME);
+  if (!latest) {
+    return;
+  }
+
+  if (compareVersions(installed, latest) >= 0) {
+    return;
+  }
+
+  await updateGlobalPackageToLatest(npmCommand, CONFIGURATOR_PACKAGE_NAME);
+};
+
 const App = () => {
   const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
   const { stdout } = useStdout();
@@ -216,7 +264,13 @@ const App = () => {
       setCodexVersionStatus(check.status);
     };
 
+    const ensureLatestConfigurator = async () => {
+      const commands = getVersionCommands();
+      await ensureLatestConfiguratorVersion(commands.npmCommand);
+    };
+
     loadVersionStatus();
+    ensureLatestConfigurator();
 
     return () => {
       isCancelled = true;

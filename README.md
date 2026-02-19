@@ -104,6 +104,15 @@ You can override either command with:
 - `CODEX_CONFIGURATOR_CODEX_BIN=<command-or-path>`
 - `CODEX_CONFIGURATOR_NPM_BIN=<command-or-path>`
 
+## Self-update behavior
+
+On startup, the app checks the npm registry for the latest `codex-configurator` version.
+If the running version is older, it automatically runs:
+
+- `npm install -g codex-configurator@latest`
+
+This uses the `npm` command from `PATH` (or `CODEX_CONFIGURATOR_NPM_BIN` if set).
+
 ## Upstream reference
 
 - Codex configuration reference: https://developers.openai.com/codex/config-reference/
