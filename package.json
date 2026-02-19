@@ -1,42 +1,42 @@
 {
-  "name": "codex-configurator",
-  "version": "0.1.0",
-  "description": "TOML-aware Ink TUI for Codex Configurator",
-  "main": "index.js",
-  "type": "module",
-  "keywords": [
-    "tui",
-    "terminal",
-    "cli",
-    "react",
-    "ink",
-    "node",
-    "configurator"
-  ],
-  "author": "Codex Configurator",
-  "license": "MIT",
-  "bin": {
-    "codex-configurator": "index.js"
-  },
-  "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "lint": "node --check index.js && node --check src/configHelp.js src/configParser.js src/constants.js src/interaction.js src/layout.js src/components/Header.js src/components/ConfigNavigator.js",
-    "build": "node --check index.js && node --check src/configHelp.js src/configParser.js src/constants.js src/interaction.js src/layout.js src/components/Header.js src/components/ConfigNavigator.js",
-    "test": "npm run lint",
-    "prepack": "npm run test"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "files": [
-    "index.js",
-    "src"
-  ],
-  "dependencies": {
-    "@iarna/toml": "^2.2.5",
-    "ink": "^6.2.1",
-    "react": "^19.0.0",
-    "toml": "^3.0.0"
-  }
+	"name": "codex-configurator",
+	"version": "0.1.1",
+	"description": "TOML-aware Ink TUI for Codex Configurator",
+	"main": "index.js",
+	"type": "module",
+	"keywords": [
+		"tui",
+		"terminal",
+		"cli",
+		"react",
+		"ink",
+		"node",
+		"configurator"
+	],
+	"author": "Codex Configurator",
+	"license": "MIT",
+	"bin": {
+		"codex-configurator": "index.js"
+	},
+	"scripts": {
+		"start": "node index.js",
+		"dev": "node index.js",
+		"lint": "node --check index.js && node --check src/configHelp.js src/configParser.js src/constants.js src/interaction.js src/layout.js src/components/Header.js src/components/ConfigNavigator.js",
+		"build": "node --check index.js && node --check src/configHelp.js src/configParser.js src/constants.js src/interaction.js src/layout.js src/components/Header.js src/components/ConfigNavigator.js",
+		"test": "npm run lint",
+		"prepack": "npm run test"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"files": [
+		"index.js",
+		"src"
+	],
+	"dependencies": {
+		"@iarna/toml": "^2.2.5",
+		"ink": "^6.2.1",
+		"react": "^19.0.0",
+		"toml": "^3.0.0"
+	}
 }
