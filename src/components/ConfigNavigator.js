@@ -6,7 +6,6 @@ import {
   getConfigOptionExplanation,
   getConfigDefaultOption,
 } from '../configHelp.js';
-import { getReferenceOptionForPath } from '../configReference.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 
@@ -68,8 +67,6 @@ const isBooleanOnlyOptions = (options) =>
   options.every((option) => typeof option === 'boolean') &&
   options.includes(false) &&
   options.includes(true);
-
-const isStringReferenceType = (type) => /^string(?:\s|$)/.test(String(type || '').trim());
 
 const renderArrayDetails = (rows) => {
   const items = rows.slice(0, 5).map((item, index) =>
@@ -263,10 +260,6 @@ export const ConfigNavigator = ({
     selectedRow && selectedRow.pathSegment != null
       ? [...pathSegments, selectedRow.pathSegment]
       : pathSegments;
-  const selectedReference = selectedRow ? getReferenceOptionForPath(selectedPath) : null;
-  const selectedIsStringField =
-    (selectedRow && typeof selectedRow.value === 'string') ||
-    isStringReferenceType(selectedReference?.type);
   const readOnlyOptions =
     selectedRow && selectedRow.kind === 'value'
       ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
@@ -280,8 +273,7 @@ export const ConfigNavigator = ({
   );
   const shouldShowReadOnlyOptions =
     readOnlyOptions.length > 0 &&
-    !isBooleanOnlyOptions(readOnlyOptions) &&
-    !selectedIsStringField;
+    !isBooleanOnlyOptions(readOnlyOptions);
 
   const editRow = rows[selected] || null;
   const editDefaultOption = editMode && editMode.mode === 'select' && editRow

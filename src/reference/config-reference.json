@@ -516,11 +516,18 @@
           ],
           "top_level": "model",
           "type": "string",
-          "enum_values": [],
+          "enum_values": [
+            "gpt-5.3-codex",
+            "gpt-5.3-codex-spark",
+            "gpt-5.2-codex",
+            "gpt-5.1-codex-max",
+            "gpt-5.2",
+            "gpt-5.1-codex-mini"
+          ],
           "description": "Model to use (e.g., `gpt-5-codex`).",
           "deprecated": false,
           "ui": {
-            "control": "text"
+            "control": "select"
           }
         },
         {
@@ -2919,11 +2926,18 @@
           ],
           "top_level": "model",
           "type": "string",
-          "enum_values": [],
+          "enum_values": [
+            "gpt-5.3-codex",
+            "gpt-5.3-codex-spark",
+            "gpt-5.2-codex",
+            "gpt-5.1-codex-max",
+            "gpt-5.2",
+            "gpt-5.1-codex-mini"
+          ],
           "description": "Model to use (e.g., `gpt-5-codex`).",
           "deprecated": false,
           "ui": {
-            "control": "text"
+            "control": "select"
           }
         },
         "review_model": {

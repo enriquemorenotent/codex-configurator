@@ -42,12 +42,12 @@ const CONFIG_PATH_OPTIONS = [
 
 const CONFIG_OPTION_EXPLANATIONS = {
   model: {
-    'gpt-5.3-codex': 'Default balanced agentic model, tuned for general coding tasks.',
-    'gpt-5.3-codex-spark': 'Fastest model in this set, optimized for quick coding responses.',
-    'gpt-5.2-codex': 'Strong frontier model for deeper code reasoning.',
-    'gpt-5.1-codex-max': 'Flagship Codex model for the deepest, fastest reasoning.',
-    'gpt-5.2': 'Latest frontier model with broad improvements across coding and reasoning.',
-    'gpt-5.1-codex-mini': 'Cheaper, faster model with lower capability than flagship options.',
+    'gpt-5.3-codex': 'Latest frontier agentic coding model.',
+    'gpt-5.3-codex-spark': 'Ultra-fast coding model.',
+    'gpt-5.2-codex': 'Frontier agentic coding model.',
+    'gpt-5.1-codex-max': 'Codex-optimized flagship for deep and fast reasoning.',
+    'gpt-5.2': 'Latest frontier model with improvements across knowledge, reasoning and coding.',
+    'gpt-5.1-codex-mini': 'Optimized for codex. Cheaper, faster, but less capable.',
   },
   trust_level: {
     trusted: 'Runs with normal trust for this path.',

@@ -534,13 +534,13 @@ const App = () => {
         return;
       }
 
-      if (isStringField(targetPath, target.value)) {
-        beginTextEditing(target, targetPath);
+      if (options.length > 0) {
+        beginEditing(target, targetPath);
         return;
       }
 
-      if (options.length > 0) {
-        beginEditing(target, targetPath);
+      if (isStringField(targetPath, target.value)) {
+        beginTextEditing(target, targetPath);
       }
       return;
     }
