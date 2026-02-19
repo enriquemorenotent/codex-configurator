@@ -21,10 +21,10 @@
 	"scripts": {
 		"start": "node index.js",
 		"dev": "node index.js",
-		"lint": "node --check index.js && node --check src/configHelp.js src/configParser.js src/constants.js src/interaction.js src/layout.js src/components/Header.js src/components/ConfigNavigator.js",
-		"build": "node --check index.js && node --check src/configHelp.js src/configParser.js src/constants.js src/interaction.js src/layout.js src/components/Header.js src/components/ConfigNavigator.js",
-		"test": "npm run lint",
-		"prepack": "npm run test"
+		"lint": "node --check index.js src/*.js src/components/*.js",
+		"build": "npm run lint",
+		"test": "node --test",
+		"prepack": "npm run lint && npm test"
 	},
 	"engines": {
 		"node": ">=18"

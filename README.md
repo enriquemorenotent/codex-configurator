@@ -79,8 +79,8 @@ If the file is missing or unreadable, the TUI displays the read error and the ex
 - `npm start`: run the TUI
 - `npm run dev`: same as `npm start`
 - `npm run lint`: syntax check for all source files
-- `npm run build`: syntax check for distributable entrypoint and modules
-- `npm test`: runs lint
+- `npm run build`: runs lint
+- `npm test`: runs the Node.js unit test suite (`node --test`)
 
 ## Project structure
 
