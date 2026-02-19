@@ -20,7 +20,14 @@ import {
   getReferenceCustomIdPlaceholder,
 } from './src/configReference.js';
 import { pathToKey, clamp } from './src/layout.js';
-import { isBackspaceKey, isDeleteKey } from './src/interaction.js';
+import {
+  isBackspaceKey,
+  isDeleteKey,
+  isPageUpKey,
+  isPageDownKey,
+  isHomeKey,
+  isEndKey,
+} from './src/interaction.js';
 import { Header } from './src/components/Header.js';
 import { ConfigNavigator } from './src/components/ConfigNavigator.js';
 
@@ -431,7 +438,15 @@ const App = () => {
           return;
         }
 
-        if (key.rightArrow || key.upArrow || key.downArrow) {
+        if (
+          key.rightArrow ||
+          key.upArrow ||
+          key.downArrow ||
+          isPageUpKey(input, key) ||
+          isPageDownKey(input, key) ||
+          isHomeKey(input, key) ||
+          isEndKey(input, key)
+        ) {
           return;
         }
 
@@ -457,6 +472,46 @@ const App = () => {
         setEditMode((previous) => ({
           ...previous,
           selectedOptionIndex: clamp(previous.selectedOptionIndex + 1, 0, previous.options.length - 1),
+        }));
+        return;
+      }
+
+      if (isPageUpKey(input, key)) {
+        setEditMode((previous) => ({
+          ...previous,
+          selectedOptionIndex: clamp(
+            previous.selectedOptionIndex - listViewportHeight,
+            0,
+            previous.options.length - 1
+          ),
+        }));
+        return;
+      }
+
+      if (isPageDownKey(input, key)) {
+        setEditMode((previous) => ({
+          ...previous,
+          selectedOptionIndex: clamp(
+            previous.selectedOptionIndex + listViewportHeight,
+            0,
+            previous.options.length - 1
+          ),
+        }));
+        return;
+      }
+
+      if (isHomeKey(input, key)) {
+        setEditMode((previous) => ({
+          ...previous,
+          selectedOptionIndex: 0,
+        }));
+        return;
+      }
+
+      if (isEndKey(input, key)) {
+        setEditMode((previous) => ({
+          ...previous,
+          selectedOptionIndex: Math.max(0, previous.options.length - 1),
         }));
         return;
       }
@@ -506,6 +561,53 @@ const App = () => {
         adjustScrollForSelection(next, listViewportHeight, rows.length);
         return next;
       });
+      return;
+    }
+
+    if (isPageUpKey(input, key)) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      setSelectedIndex((previous) => {
+        const next = Math.max(previous - listViewportHeight, 0);
+        adjustScrollForSelection(next, listViewportHeight, rows.length);
+        return next;
+      });
+      return;
+    }
+
+    if (isPageDownKey(input, key)) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      setSelectedIndex((previous) => {
+        const next = Math.min(previous + listViewportHeight, rows.length - 1);
+        adjustScrollForSelection(next, listViewportHeight, rows.length);
+        return next;
+      });
+      return;
+    }
+
+    if (isHomeKey(input, key)) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      setSelectedIndex(0);
+      adjustScrollForSelection(0, listViewportHeight, rows.length);
+      return;
+    }
+
+    if (isEndKey(input, key)) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      const next = rows.length - 1;
+      setSelectedIndex(next);
+      adjustScrollForSelection(next, listViewportHeight, rows.length);
       return;
     }
 
