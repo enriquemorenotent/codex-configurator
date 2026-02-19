@@ -49,6 +49,8 @@ The table view follows TOML structure, with a root catalog of common keys:
 - Feature rows tagged with `[not in official list]` come from your file but are not in the curated official set.
 - Selected sections such as `history`, `tui`, `feedback`, and `shell_environment_policy` also show common unset keys.
 - Attributes and subattributes are shown in strict alphabetical order.
+- Unset boolean settings display explicit defaults as `true [default]` or `false [default]`.
+- For placeholder keys like `<path>`, IDs entered in the UI are normalized under your home directory.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.

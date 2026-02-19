@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import React, { useState, useEffect } from 'react';
+import os from 'os';
+import path from 'path';
 import { execSync } from 'node:child_process';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
 import { CONTROL_HINT, EDIT_CONTROL_HINT } from './src/constants.js';
@@ -48,6 +50,20 @@ const isCustomIdTableRow = (pathSegments, row) =>
   Boolean(getReferenceCustomIdPlaceholder(pathSegments));
 
 const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
+
+const normalizeCustomPathId = (value) => {
+  const trimmedValue = String(value || '').trim();
+  if (!trimmedValue) {
+    return '';
+  }
+
+  const withoutTilde = trimmedValue.startsWith('~')
+    ? trimmedValue.slice(1)
+    : trimmedValue;
+  const relativePath = withoutTilde.replace(/^[/\\]+/, '');
+
+  return path.join(os.homedir(), relativePath);
+};
 
 const getCodexVersion = () => {
   try {
@@ -291,7 +307,12 @@ const App = () => {
       return;
     }
 
-    const nextId = String(editMode.draftValue || '').trim();
+    const nextIdInput = String(editMode.draftValue || '').trim();
+    const placeholder = getReferenceCustomIdPlaceholder(editMode.path);
+    const nextId = placeholder === '<path>'
+      ? normalizeCustomPathId(nextIdInput)
+      : nextIdInput;
+
     if (!nextId) {
       setEditError('ID cannot be empty.');
       return;
@@ -327,21 +348,9 @@ const App = () => {
   };
 
   const applyBooleanToggle = (target, targetPath) => {
-    const shouldUseDefault = target?.isConfigured === false;
-    const isFeatureBoolean =
-      targetPath.length >= 2 &&
-      targetPath[targetPath.length - 2] === 'features';
-
-    let nextValue = !target.value;
-    if (isFeatureBoolean && target.value === false && !shouldUseDefault) {
-      nextValue = null;
-    }
-
+    const nextValue = !target.value;
     const data = snapshot.ok ? snapshot.data : {};
-    const nextData =
-      nextValue === null
-        ? deleteValueAtPath(data, targetPath)
-        : setValueAtPath(data, targetPath, nextValue);
+    const nextData = setValueAtPath(data, targetPath, nextValue);
 
     const writeResult = writeConfig(nextData, snapshot.path);
 
@@ -408,7 +417,13 @@ const App = () => {
           return;
         }
 
-        if (isBackspaceKey(input, key) || isDeleteKey(input, key)) {
+        if (key.leftArrow || isBackspaceKey(input, key)) {
+          setEditMode(null);
+          setEditError('');
+          return;
+        }
+
+        if (isDeleteKey(input, key)) {
           setEditMode((previous) => ({
             ...previous,
             draftValue: previous.draftValue.slice(0, -1),
@@ -416,7 +431,7 @@ const App = () => {
           return;
         }
 
-        if (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow) {
+        if (key.rightArrow || key.upArrow || key.downArrow) {
           return;
         }
 

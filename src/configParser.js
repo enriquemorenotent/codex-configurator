@@ -167,7 +167,7 @@ const buildFeatureRows = (node) => {
       ? definition.defaultValue
       : false;
     const value = isConfigured ? node[key] : defaultValue;
-    const preview = isConfigured ? previewValue(value) : 'default';
+    const preview = isConfigured ? previewValue(value) : `${String(defaultValue)} [default]`;
     const isDeprecated = Boolean(definition?.deprecation);
 
     seenKeys.add(key);
@@ -209,8 +209,57 @@ const buildFeatureRows = (node) => {
   ]);
 };
 
-const formatMissingDefinitionLabel = (definition) =>
-  definition.kind === 'table' ? `${definition.key} /` : `${definition.key} = default`;
+const isStringReferenceType = (type) => /^string(?:\s|$)/.test(String(type || '').trim());
+const isBooleanReferenceType = (type) => String(type || '').trim() === 'boolean';
+
+const inferBooleanDefaultFromDescription = (description) => {
+  const text = String(description || '');
+
+  if (
+    /\bdefaults?\s+to\s+true\b/i.test(text) ||
+    /\bdefault:\s*true\b/i.test(text) ||
+    /\bdefault\s*=\s*true\b/i.test(text)
+  ) {
+    return true;
+  }
+
+  if (
+    /\bdefaults?\s+to\s+false\b/i.test(text) ||
+    /\bdefault:\s*false\b/i.test(text) ||
+    /\bdefault\s*=\s*false\b/i.test(text)
+  ) {
+    return false;
+  }
+
+  return false;
+};
+
+const getBooleanReferenceDefault = (pathSegments, key) => {
+  const referenceOption = getReferenceOptionForPath([...pathSegments, String(key)]);
+  if (!isBooleanReferenceType(referenceOption?.type)) {
+    return null;
+  }
+
+  return inferBooleanDefaultFromDescription(referenceOption?.description);
+};
+
+const formatMissingDefinitionLabel = (definition, pathSegments) => {
+  if (definition.kind === 'table') {
+    return `${definition.key} /`;
+  }
+
+  const booleanDefault = getBooleanReferenceDefault(pathSegments, definition.key);
+  if (booleanDefault !== null) {
+    return `${definition.key} = ${String(booleanDefault)} [default]`;
+  }
+
+  const referenceOption = getReferenceOptionForPath([...pathSegments, String(definition.key)]);
+  if (isStringReferenceType(referenceOption?.type)) {
+    return `${definition.key} = ""`;
+  }
+
+  return `${definition.key} = default`;
+};
 
 const formatRowLabel = (key, kind, value) =>
   kind === 'table'
@@ -269,20 +318,23 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
     seenKeys.add(definition.key);
 
     if (!isConfigured) {
+      const booleanDefault = getBooleanReferenceDefault(pathSegments, definition.key);
       const value =
         definition.kind === 'table'
           ? {}
           : definition.kind === 'array'
             ? []
-            : undefined;
+            : booleanDefault !== null
+              ? booleanDefault
+              : undefined;
 
       rows.push({
         key: definition.key,
         kind: definition.kind,
         value,
         pathSegment: definition.key,
-        label: formatMissingDefinitionLabel(definition),
-        preview: 'default',
+        label: formatMissingDefinitionLabel(definition, pathSegments),
+        preview: booleanDefault !== null ? `${String(booleanDefault)} [default]` : 'default',
         isConfigured: false,
         isDeprecated: Boolean(definition.isDeprecated) || isPathDeprecated(pathSegments, definition.key),
       });

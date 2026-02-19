@@ -2787,12 +2787,15 @@
             "trust_level"
           ],
           "top_level": "projects",
-          "type": "string",
-          "enum_values": [],
+          "type": "trusted | untrusted",
+          "enum_values": [
+            "trusted",
+            "untrusted"
+          ],
           "description": "Mark a project or worktree as trusted or untrusted (`\"trusted\"` | `\"untrusted\"`). Untrusted projects skip project-scoped `.codex/` layers.",
           "deprecated": false,
           "ui": {
-            "control": "text"
+            "control": "select"
           }
         },
         {
@@ -5197,12 +5200,15 @@
             "trust_level"
           ],
           "top_level": "projects",
-          "type": "string",
-          "enum_values": [],
+          "type": "trusted | untrusted",
+          "enum_values": [
+            "trusted",
+            "untrusted"
+          ],
           "description": "Mark a project or worktree as trusted or untrusted (`\"trusted\"` | `\"untrusted\"`). Untrusted projects skip project-scoped `.codex/` layers.",
           "deprecated": false,
           "ui": {
-            "control": "text"
+            "control": "select"
           }
         },
         "notice.hide_full_access_warning": {

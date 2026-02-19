@@ -113,7 +113,8 @@ const renderEditableOptions = (
     const valueText = `${prefix}${optionValueText}`;
     const explanation = getConfigOptionExplanation(optionPathSegments, rowKey, option);
     const isDefault = optionIndex === defaultOptionIndex;
-    return { optionIndex, valueText, explanation, optionValueText, isDefault };
+    const highlightDefault = selectedOptionIndex < 0 && isDefault;
+    return { optionIndex, valueText, explanation, optionValueText, isDefault, highlightDefault };
   });
 
   const valueWidth = optionRows.reduce((max, item) => Math.max(max, item.valueText.length), 0);
@@ -121,7 +122,8 @@ const renderEditableOptions = (
   return React.createElement(
     React.Fragment,
     null,
-    ...optionRows.map(({ optionIndex, valueText, explanation, optionValueText, isDefault }) =>
+    ...optionRows.map(
+      ({ optionIndex, valueText, explanation, optionValueText, isDefault, highlightDefault }) =>
       React.createElement(
         Box,
         {
@@ -136,8 +138,12 @@ const renderEditableOptions = (
           React.createElement(
             Text,
             {
-              color: optionIndex === selectedOptionIndex ? 'yellow' : 'white',
-              bold: optionIndex === selectedOptionIndex,
+              color: optionIndex === selectedOptionIndex
+                ? 'yellow'
+                : highlightDefault
+                  ? 'whiteBright'
+                  : 'white',
+              bold: optionIndex === selectedOptionIndex || highlightDefault,
             },
             `${valueText.padEnd(valueWidth, ' ')}`
           ),

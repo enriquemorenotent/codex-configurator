@@ -84,11 +84,11 @@ const getReferenceUsage = (entry) => {
   }
 
   if (entry.enumValues.length > 0) {
-    return `Allowed values: ${entry.enumValues.join(', ')}.`;
+    return null;
   }
 
   if (entry.type === 'boolean') {
-    return 'Toggle between true and false.';
+    return null;
   }
 
   if (entry.type === 'table') {
