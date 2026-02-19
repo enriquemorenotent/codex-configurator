@@ -38,6 +38,7 @@ npm start
 - `PgUp` `PgDn`: move one page up/down
 - `Home` `End`: jump to first/last item
 - `Enter`: open selected table; for boolean settings, toggle directly; for string settings, open inline input; for other preset values, open picker
+- `/`: start fuzzy filter mode for the current list
 - `Del`: unset selected value or remove selected custom `<id>` entry from `config.toml`
 - `←` / `Backspace`: move up one level (to parent table)
 - `r`: reload the active config file
@@ -49,6 +50,8 @@ Model picker entries are curated presets maintained by this project.
 In select lists, `[default]` marks the default option.
 The header banner shows the configurator package version (for example `v0.2.2`) next to the wordmark.
 Section help includes purpose-driven guidance (what a section is for), not generic placeholder copy.
+Fuzzy filter mode matches section/value rows by label and key as you type.
+The list panel shows a breadcrumb title on its top border with your current path (for example `projects > /home/me/repo`).
 
 ## TOML-aware navigation
 

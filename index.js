@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
-import { CONTROL_HINT, EDIT_CONTROL_HINT } from './src/constants.js';
+import { CONTROL_HINT, EDIT_CONTROL_HINT, FILTER_CONTROL_HINT } from './src/constants.js';
 import {
   readConfig,
   getNodeAtPath,
@@ -30,6 +30,7 @@ import {
 } from './src/interaction.js';
 import { Header } from './src/components/Header.js';
 import { ConfigNavigator } from './src/components/ConfigNavigator.js';
+import { filterRowsByQuery } from './src/fuzzySearch.js';
 
 const require = createRequire(import.meta.url);
 const { version: PACKAGE_VERSION = 'unknown' } = require('./package.json');
@@ -246,6 +247,8 @@ const App = () => {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [editMode, setEditMode] = useState(null);
   const [editError, setEditError] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [isFilterEditing, setIsFilterEditing] = useState(false);
   const [codexVersion, setCodexVersion] = useState('version loading...');
   const [codexVersionStatus, setCodexVersionStatus] = useState('');
   const { exit } = useApp();
@@ -278,7 +281,8 @@ const App = () => {
   }, []);
 
   const currentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, pathSegments);
-  const rows = buildRows(currentNode, pathSegments);
+  const allRows = buildRows(currentNode, pathSegments);
+  const rows = filterRowsByQuery(allRows, filterQuery);
   const safeSelected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
   const listViewportHeight = computeListViewportHeight(rows, terminalHeight);
   const currentPathKey = pathToKey(pathSegments);
@@ -495,8 +499,48 @@ const App = () => {
   useInput((input, key) => {
     const isTextEditing = isInlineTextMode(editMode?.mode);
 
+    if (isFilterEditing) {
+      if (key.return || key.escape) {
+        setIsFilterEditing(false);
+        return;
+      }
+
+      if ((key.ctrl && key.name === 'u') || input === '\u0015') {
+        setFilterQuery('');
+        return;
+      }
+
+      if (isDeleteKey(input, key) || isBackspaceKey(input, key)) {
+        setFilterQuery((previous) => previous.slice(0, -1));
+        return;
+      }
+
+      if (
+        key.rightArrow ||
+        key.leftArrow ||
+        key.upArrow ||
+        key.downArrow ||
+        isPageUpKey(input, key) ||
+        isPageDownKey(input, key) ||
+        isHomeKey(input, key) ||
+        isEndKey(input, key)
+      ) {
+        return;
+      }
+
+      if (!key.ctrl && !key.meta && input.length > 0) {
+        setFilterQuery((previous) => `${previous}${input}`);
+      }
+      return;
+    }
+
     if (input === 'q' && !isTextEditing) {
       exit();
+      return;
+    }
+
+    if (!editMode && input === '/') {
+      setIsFilterEditing(true);
       return;
     }
 
@@ -830,6 +874,8 @@ const App = () => {
         scrollOffset: 0,
         editMode: null,
         editError: editError,
+        filterQuery,
+        isFilterEditing,
       }),
       React.createElement(Text, { color: 'yellow' }, 'Non-interactive mode: input is disabled.')
     );
@@ -852,8 +898,14 @@ const App = () => {
       scrollOffset,
       editMode,
       editError,
+      filterQuery,
+      isFilterEditing,
     }),
-    React.createElement(Text, { color: 'gray' }, editMode ? EDIT_CONTROL_HINT : CONTROL_HINT)
+    React.createElement(
+      Text,
+      { color: 'gray' },
+      isFilterEditing ? FILTER_CONTROL_HINT : editMode ? EDIT_CONTROL_HINT : CONTROL_HINT
+    )
   );
 };
 

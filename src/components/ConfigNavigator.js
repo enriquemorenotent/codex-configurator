@@ -8,6 +8,7 @@ import {
 } from '../configHelp.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows } from '../configParser.js';
+import { filterRowsByQuery } from '../fuzzySearch.js';
 
 const MenuItem = ({ isSelected, isDimmed, isDeprecated, label }) =>
   React.createElement(
@@ -97,6 +98,19 @@ const renderIdEditor = (placeholder, draftValue) =>
     React.createElement(Text, { color: 'white' }, `${placeholder || 'id'}: ${draftValue}`),
     React.createElement(Text, { color: 'gray' }, 'Type id • Enter: create • Esc: cancel')
   );
+
+const formatBreadcrumbSegment = (segment) => {
+  const value = String(segment);
+  return /^\d+$/.test(value) ? `[${value}]` : value;
+};
+
+const formatBreadcrumbs = (pathSegments) => {
+  if (!Array.isArray(pathSegments) || pathSegments.length === 0) {
+    return '';
+  }
+
+  return pathSegments.map(formatBreadcrumbSegment).join(' > ');
+};
 
 const formatSectionSummary = (row) => {
   if (row?.kind === 'table') {
@@ -267,6 +281,8 @@ export const ConfigNavigator = ({
   terminalHeight,
   editMode,
   editError,
+  filterQuery = '',
+  isFilterEditing = false,
 }) => {
   if (!snapshot.ok) {
     return React.createElement(
@@ -279,9 +295,13 @@ export const ConfigNavigator = ({
   }
 
   const currentNode = getNodeAtPath(snapshot.data, pathSegments);
-  const rows = buildRows(currentNode, pathSegments);
+  const allRows = buildRows(currentNode, pathSegments);
+  const rows = filterRowsByQuery(allRows, filterQuery);
+  const breadcrumbs = formatBreadcrumbs(pathSegments);
   const selected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
-  const { leftWidth, rightWidth } = computePaneWidths(terminalWidth, rows);
+  const paneSizingRows = breadcrumbs ? [...rows, { label: breadcrumbs }] : rows;
+  const { leftWidth, rightWidth } = computePaneWidths(terminalWidth, paneSizingRows);
+  const breadcrumbLabel = breadcrumbs ? truncate(breadcrumbs, Math.max(8, leftWidth - 6)) : '';
   const terminalListHeight = Math.max(4, (terminalHeight || 24) - 14);
   const viewportHeight = Math.max(4, Math.min(rows.length, Math.min(20, terminalListHeight)));
   const viewportStart = clamp(scrollOffset, 0, Math.max(0, rows.length - viewportHeight));
@@ -319,96 +339,138 @@ export const ConfigNavigator = ({
   return React.createElement(
     Box,
     { flexDirection: 'row', gap: 2 },
-    React.createElement(
-      Box,
-      { flexDirection: 'column', width: leftWidth },
       React.createElement(
         Box,
-        {
-          flexDirection: 'column',
-          borderStyle: 'single',
-          borderColor: 'gray',
-          padding: 1,
-        },
-        rows.length === 0
-          ? React.createElement(Text, { color: 'gray' }, '[no entries in this table]')
-          : visibleRows.map((row, viewIndex) => {
-              const index = viewportStart + viewIndex;
-              const showTopCue = canScrollUp && viewIndex === 0;
-              const showBottomCue = canScrollDown && viewIndex === visibleRows.length - 1;
-              const isSelected = index === selected;
-              const label = `${showTopCue ? '↑ ' : showBottomCue ? '↓ ' : '  '}${isSelected ? '▶' : ' '} ${row.label}`;
+        { flexDirection: 'column', width: leftWidth },
+        React.createElement(
+          Box,
+          {
+            flexDirection: 'column',
+            borderStyle: 'single',
+            borderColor: 'gray',
+            padding: 1,
+          },
+          rows.length === 0
+            ? React.createElement(
+                Text,
+                { color: 'gray' },
+                String(filterQuery || '').trim().length > 0
+                  ? '[no entries match current filter]'
+                  : '[no entries in this table]'
+              )
+            : visibleRows.map((row, viewIndex) => {
+                const index = viewportStart + viewIndex;
+                const showTopCue = canScrollUp && viewIndex === 0;
+                const showBottomCue = canScrollDown && viewIndex === visibleRows.length - 1;
+                const isSelected = index === selected;
+                const label = `${showTopCue ? '↑ ' : showBottomCue ? '↓ ' : '  '}${isSelected ? '▶' : ' '} ${row.label}`;
 
-              return React.createElement(
-                MenuItem,
-                {
-                  label,
-                  isSelected,
-                  isDimmed: !isSelected && row.isConfigured === false,
-                  isDeprecated: row.isDeprecated,
-                  key: `left-${index}`,
-                }
-              );
-            })
-      )
-    ),
-    React.createElement(
-      Box,
-      { flexDirection: 'column', width: rightWidth, marginTop: 2 },
-      rows.length === 0
-        ? React.createElement(Text, { color: 'gray' }, 'No selection available.')
-        : React.createElement(
-            React.Fragment,
-            null,
-              ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
-                React.createElement(
-                  Text,
+                return React.createElement(
+                  MenuItem,
                   {
-                    key: `help-${selected}-${lineIndex}`,
-                    color: line.color,
-                    bold: line.bold,
-                  },
-                  line.showWarningIcon
-                    ? React.createElement(Text, { color: 'yellow' }, '[!] ')
-                    : null,
-                  line.text
-                )
-              ),
-            editError ? React.createElement(Text, { color: 'red' }, editError) : null,
-            editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
-            editMode
-              ? editMode.mode === 'text'
-                ? renderTextEditor(editMode.draftValue)
-                : editMode.mode === 'add-id'
-                  ? renderIdEditor(editMode.placeholder, editMode.draftValue)
-                : renderEditableOptions(
-                    editMode.options,
-                    editMode.selectedOptionIndex,
-                    editDefaultOptionIndex,
-                    editMode.path.slice(0, -1),
-                    rows[selected].key,
-                    editMode.savedOptionIndex,
-                    true
+                    label,
+                    isSelected,
+                    isDimmed: !isSelected && row.isConfigured === false,
+                    isDeprecated: row.isDeprecated,
+                    key: `left-${index}`,
+                  }
+                );
+              })
+        ),
+        React.createElement(
+          Box,
+          { position: 'absolute', top: 0, left: 0 },
+          breadcrumbLabel
+            ? React.createElement(
+                Text,
+                null,
+                React.createElement(Text, { color: 'gray' }, '┌── '),
+                React.createElement(Text, { color: 'cyan' }, `${breadcrumbLabel} `)
+              )
+            : null
+        )
+      ),
+      React.createElement(
+        Box,
+        { flexDirection: 'column', width: rightWidth, marginTop: 1 },
+        rows.length === 0
+          ? React.createElement(
+              React.Fragment,
+              null,
+              String(filterQuery || '').trim().length > 0
+                ? React.createElement(
+                    Text,
+                    { color: 'gray' },
+                    `Filter: ${filterQuery} (${rows.length}/${allRows.length})`
                   )
-              : shouldShowReadOnlyOptions
+                : null,
+              React.createElement(
+                Text,
+                { color: 'gray' },
+                String(filterQuery || '').trim().length > 0
+                  ? 'No selection available. Adjust or clear the filter.'
+                  : 'No selection available.'
+              )
+            )
+          : React.createElement(
+              React.Fragment,
+              null,
+                String(filterQuery || '').trim().length > 0 || isFilterEditing
                   ? React.createElement(
-                      React.Fragment,
-                      null,
-                      React.createElement(Text, { color: 'gray' }, ' '),
-                      renderEditableOptions(
-                        readOnlyOptions,
-                        readOnlyOptionIndex,
-                        readOnlyDefaultOptionIndex,
-                        selectedPath,
-                        selectedRow?.key,
-                        null,
-                        false
-                      )
+                      Text,
+                      { color: 'cyan' },
+                      `Filter: ${filterQuery || ''} (${rows.length}/${allRows.length})${isFilterEditing ? ' [editing]' : ''}`
                     )
-                  : rows[selected].kind === 'array'
-                      ? renderArrayDetails(rows[selected].value)
-                      : null
-          )
-    )
+                  : null,
+                ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
+                  React.createElement(
+                    Text,
+                    {
+                      key: `help-${selected}-${lineIndex}`,
+                      color: line.color,
+                      bold: line.bold,
+                    },
+                    line.showWarningIcon
+                      ? React.createElement(Text, { color: 'yellow' }, '[!] ')
+                      : null,
+                    line.text
+                  )
+                ),
+              editError ? React.createElement(Text, { color: 'red' }, editError) : null,
+              editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
+              editMode
+                ? editMode.mode === 'text'
+                  ? renderTextEditor(editMode.draftValue)
+                  : editMode.mode === 'add-id'
+                    ? renderIdEditor(editMode.placeholder, editMode.draftValue)
+                  : renderEditableOptions(
+                      editMode.options,
+                      editMode.selectedOptionIndex,
+                      editDefaultOptionIndex,
+                      editMode.path.slice(0, -1),
+                      rows[selected].key,
+                      editMode.savedOptionIndex,
+                      true
+                    )
+                : shouldShowReadOnlyOptions
+                    ? React.createElement(
+                        React.Fragment,
+                        null,
+                        React.createElement(Text, { color: 'gray' }, ' '),
+                        renderEditableOptions(
+                          readOnlyOptions,
+                          readOnlyOptionIndex,
+                          readOnlyDefaultOptionIndex,
+                          selectedPath,
+                          selectedRow?.key,
+                          null,
+                          false
+                        )
+                      )
+                    : rows[selected].kind === 'array'
+                        ? renderArrayDetails(rows[selected].value)
+                        : null
+            )
+      )
   );
 };
