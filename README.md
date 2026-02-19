@@ -47,7 +47,8 @@ The right-hand pane shows what each setting means, plus a picker when a value ha
 Deprecated settings are marked with a `[!]` warning marker; only that marker is highlighted.
 Model picker entries are curated presets maintained by this project.
 In select lists, `[default]` marks the default option.
-The header banner shows the configurator package version (for example `v0.2.1`) next to the wordmark.
+The header banner shows the configurator package version (for example `v0.2.2`) next to the wordmark.
+Section help includes purpose-driven guidance (what a section is for), not generic placeholder copy.
 
 ## TOML-aware navigation
 

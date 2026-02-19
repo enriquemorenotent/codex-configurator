@@ -2,7 +2,12 @@ import {
   getConfigFeatureDefinition,
   getConfigFeatureDefinitionOrFallback,
 } from './configFeatures.js';
-import { getReferenceOptionForPath } from './configReference.js';
+import {
+  getReferenceOptionForPath,
+  getReferenceCustomIdPlaceholder,
+  getReferenceDescendantOptions,
+  getReferenceTableDefinitions,
+} from './configReference.js';
 
 const CONFIG_VALUE_OPTIONS = {
   model: [
@@ -54,6 +59,24 @@ const CONFIG_OPTION_EXPLANATIONS = {
     untrusted: 'Limits risky actions and prompts more often.',
   },
 };
+const SECTION_PURPOSE_OVERRIDES = {
+  agents: 'Named agent definitions and per-agent configuration file references.',
+  apps: 'Per-app enablement rules and disable reasons.',
+  features: 'Feature flags for optional and experimental Codex behavior.',
+  feedback: 'Feedback submission settings for Codex surfaces.',
+  history: 'Session history retention policy and on-disk size limits.',
+  mcp_servers: 'MCP server definitions, transport settings, and authentication configuration.',
+  model_providers: 'Model provider definitions, API endpoints, and credential settings.',
+  notice: 'Visibility toggles for startup and migration notices.',
+  otel: 'OpenTelemetry exporter configuration for telemetry and traces.',
+  profiles: 'Named profile overrides you can select per session.',
+  projects: 'Project/worktree trust settings scoped by filesystem path.',
+  sandbox_workspace_write: 'Workspace-write sandbox behavior, writable roots, and network access rules.',
+  shell_environment_policy: 'Shell environment inheritance and variable override policy.',
+  skills: 'Skill discovery and loading controls.',
+  tools: 'Tool-related configuration, including legacy compatibility flags.',
+  tui: 'Terminal UI behavior, notifications, and presentation settings.',
+};
 
 const makePathSegments = (segments, key) => {
   const normalizedSegments = Array.isArray(segments)
@@ -78,6 +101,73 @@ const getContextEntry = (segments, key, candidates) => {
 
 const getReferenceEntry = (segments, key) => getReferenceOptionForPath(makePathSegments(segments, key));
 
+const formatPlaceholderLabel = (placeholder) => {
+  const cleaned = String(placeholder || '')
+    .replace(/^</, '')
+    .replace(/>$/, '');
+
+  return cleaned || 'id';
+};
+
+const toFirstSentence = (text) => {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  const periodIndex = normalized.indexOf('. ');
+  if (periodIndex < 0) {
+    return normalized;
+  }
+
+  return normalized.slice(0, periodIndex + 1);
+};
+
+const getSectionPurposeDescription = (descendantOptions) => {
+  for (const option of descendantOptions) {
+    const firstSentence = toFirstSentence(option?.description);
+    if (firstSentence) {
+      return firstSentence;
+    }
+  }
+
+  return '';
+};
+
+const buildInferredSectionHelp = (segments, key) => {
+  const sectionPath = makePathSegments(segments, key);
+  const childDefinitions = getReferenceTableDefinitions(sectionPath);
+  const descendantOptions = getReferenceDescendantOptions(sectionPath);
+  const customPlaceholder = getReferenceCustomIdPlaceholder(sectionPath);
+  const parentCustomPlaceholder = getReferenceCustomIdPlaceholder(sectionPath.slice(0, -1));
+
+  if (childDefinitions.length === 0 && descendantOptions.length === 0 && !customPlaceholder) {
+    return null;
+  }
+
+  const rootOverride = sectionPath.length === 1
+    ? SECTION_PURPOSE_OVERRIDES[sectionPath[0]]
+    : null;
+  const customLabel = customPlaceholder ? formatPlaceholderLabel(customPlaceholder) : '';
+  const bestPurposeDescription = getSectionPurposeDescription(descendantOptions);
+  const dynamicEntryLabel = parentCustomPlaceholder
+    ? formatPlaceholderLabel(parentCustomPlaceholder)
+    : '';
+  const short = rootOverride
+    || (dynamicEntryLabel
+      ? `Configuration for this ${dynamicEntryLabel} entry.`
+      : '')
+    || bestPurposeDescription
+    || (customLabel
+      ? `Section for custom ${customLabel} entries.`
+      : 'Section with related settings.');
+
+  return {
+    short,
+    usage: null,
+  };
+};
+
 const getReferenceUsage = (entry) => {
   if (entry.deprecated) {
     return 'This option is deprecated in the official configuration reference.';
@@ -92,7 +182,7 @@ const getReferenceUsage = (entry) => {
   }
 
   if (entry.type === 'table') {
-    return 'This section groups related settings.';
+    return 'Press Enter to open this section and edit nested settings.';
   }
 
   if (entry.type.startsWith('array<')) {
@@ -142,6 +232,11 @@ export const getConfigHelp = (segments, key) => {
 
   if (referenceHelp) {
     return referenceHelp;
+  }
+
+  const inferredSectionHelp = buildInferredSectionHelp(segments, key);
+  if (inferredSectionHelp) {
+    return inferredSectionHelp;
   }
 
   return null;

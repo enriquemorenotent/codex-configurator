@@ -98,6 +98,32 @@ const renderIdEditor = (placeholder, draftValue) =>
     React.createElement(Text, { color: 'gray' }, 'Type id • Enter: create • Esc: cancel')
   );
 
+const formatSectionSummary = (row) => {
+  if (row?.kind === 'table') {
+    const entryCount =
+      Object.prototype.toString.call(row?.value) === '[object Object]'
+        ? Object.keys(row.value).length
+        : 0;
+
+    if (entryCount === 0) {
+      return 'Empty section.';
+    }
+
+    return `Section with ${entryCount} configured ${entryCount === 1 ? 'entry' : 'entries'}.`;
+  }
+
+  if (row?.kind === 'tableArray') {
+    const entryCount = Array.isArray(row?.value) ? row.value.length : 0;
+    if (entryCount === 0) {
+      return 'Section with no entries.';
+    }
+
+    return `Section list with ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'}.`;
+  }
+
+  return 'This section groups related settings.';
+};
+
 const renderEditableOptions = (
   options,
   selectedOptionIndex,
@@ -181,14 +207,15 @@ const formatConfigHelp = (pathSegments, row) => {
   }
 
   const info = getConfigHelp(pathSegments, row.key);
+  const isSectionRow = row.kind === 'table' || row.kind === 'tableArray';
   const defaultCollectionText =
-    row.kind === 'table' || row.kind === 'tableArray'
-      ? 'This section groups related settings.'
+    isSectionRow
+      ? formatSectionSummary(row)
       : row.kind === 'array'
         ? `This is a list with ${row.value.length} entries.`
         : 'This setting affects Codex behavior.';
   const short = info?.short || defaultCollectionText;
-  const usage = info?.usage;
+  const usage = isSectionRow ? null : info?.usage;
   const isWarning = Boolean(info?.deprecation);
   const lines = [{ text: short, color: 'white', bold: false, showWarningIcon: false }];
 

@@ -218,3 +218,15 @@ export const getReferenceCustomIdPlaceholder = (pathSegments = []) => {
   const [firstMatch] = [...placeholders];
   return firstMatch || null;
 };
+
+export const getReferenceDescendantOptions = (pathSegments = []) => {
+  const normalizedPath = normalizeSegments(pathSegments);
+
+  return referenceOptions
+    .filter(
+      (option) =>
+        pathPrefixMatches(option.keyPath, normalizedPath) &&
+        option.keyPath.length > normalizedPath.length
+    )
+    .sort((left, right) => left.keyPath.length - right.keyPath.length || left.key.localeCompare(right.key));
+};
