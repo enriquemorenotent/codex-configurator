@@ -6,6 +6,7 @@ import {
   getConfigOptionExplanation,
   getConfigDefaultOption,
 } from '../configHelp.js';
+import { getReferenceOptionForPath } from '../configReference.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
 
@@ -61,6 +62,15 @@ const formatOptionValue = (value) => {
 const truncate = (text, maxLength) =>
   text.length <= maxLength ? text : `${text.slice(0, Math.max(0, maxLength - 1))}…`;
 
+const isBooleanOnlyOptions = (options) =>
+  Array.isArray(options) &&
+  options.length === 2 &&
+  options.every((option) => typeof option === 'boolean') &&
+  options.includes(false) &&
+  options.includes(true);
+
+const isStringReferenceType = (type) => /^string(?:\s|$)/.test(String(type || '').trim());
+
 const renderArrayDetails = (rows) => {
   const items = rows.slice(0, 5).map((item, index) =>
     React.createElement(Text, { key: `array-item-${index}` }, `  ${index + 1}. ${formatArrayItem(item)}`)
@@ -74,6 +84,22 @@ const renderArrayDetails = (rows) => {
     overflow > 0 ? React.createElement(Text, { key: 'array-more' }, `  … and ${overflow} more`) : null
   );
 };
+
+const renderTextEditor = (draftValue) =>
+  React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(Text, { color: 'white' }, `> ${draftValue}`),
+    React.createElement(Text, { color: 'gray' }, 'Type to edit • Enter: save • Esc: cancel')
+  );
+
+const renderIdEditor = (placeholder, draftValue) =>
+  React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(Text, { color: 'white' }, `${placeholder || 'id'}: ${draftValue}`),
+    React.createElement(Text, { color: 'gray' }, 'Type id • Enter: create • Esc: cancel')
+  );
 
 const renderEditableOptions = (
   options,
@@ -134,6 +160,23 @@ const renderEditableOptions = (
 };
 
 const formatConfigHelp = (pathSegments, row) => {
+  if (row?.kind === 'action' && row?.action === 'add-custom-id') {
+    return [
+      {
+        text: `Create a new custom "${row.placeholder || 'id'}" entry in this section.`,
+        color: 'white',
+        bold: false,
+        showWarningIcon: false,
+      },
+      {
+        text: 'Press Enter to type the id, then Enter again to save.',
+        color: 'gray',
+        bold: false,
+        showWarningIcon: false,
+      },
+    ];
+  }
+
   const info = getConfigHelp(pathSegments, row.key);
   const defaultCollectionText =
     row.kind === 'table' || row.kind === 'tableArray'
@@ -216,7 +259,14 @@ export const ConfigNavigator = ({
   const canScrollUp = viewportStart > 0;
   const canScrollDown = viewportStart + viewportHeight < rows.length;
   const selectedRow = rows[selected] || null;
-  const selectedPath = selectedRow ? [...pathSegments, selectedRow.pathSegment] : pathSegments;
+  const selectedPath =
+    selectedRow && selectedRow.pathSegment != null
+      ? [...pathSegments, selectedRow.pathSegment]
+      : pathSegments;
+  const selectedReference = selectedRow ? getReferenceOptionForPath(selectedPath) : null;
+  const selectedIsStringField =
+    (selectedRow && typeof selectedRow.value === 'string') ||
+    isStringReferenceType(selectedReference?.type);
   const readOnlyOptions =
     selectedRow && selectedRow.kind === 'value'
       ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
@@ -230,13 +280,14 @@ export const ConfigNavigator = ({
   );
   const shouldShowReadOnlyOptions =
     readOnlyOptions.length > 0 &&
-    typeof selectedRow?.value !== 'boolean';
+    !isBooleanOnlyOptions(readOnlyOptions) &&
+    !selectedIsStringField;
 
   const editRow = rows[selected] || null;
-  const editDefaultOption = editMode && editRow
+  const editDefaultOption = editMode && editMode.mode === 'select' && editRow
     ? getConfigDefaultOption(editMode.path, editRow.key, 'value', editMode.options)
     : null;
-  const editDefaultOptionIndex = editMode
+  const editDefaultOptionIndex = editMode && editMode.mode === 'select'
     ? editMode.options.findIndex((option) => Object.is(option, editDefaultOption))
     : -1;
 
@@ -301,15 +352,19 @@ export const ConfigNavigator = ({
             editError ? React.createElement(Text, { color: 'red' }, editError) : null,
             editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
             editMode
-              ? renderEditableOptions(
-                  editMode.options,
-                  editMode.selectedOptionIndex,
-                  editDefaultOptionIndex,
-                  editMode.path.slice(0, -1),
-                  rows[selected].key,
-                  editMode.savedOptionIndex,
-                  true
-                )
+              ? editMode.mode === 'text'
+                ? renderTextEditor(editMode.draftValue)
+                : editMode.mode === 'add-id'
+                  ? renderIdEditor(editMode.placeholder, editMode.draftValue)
+                : renderEditableOptions(
+                    editMode.options,
+                    editMode.selectedOptionIndex,
+                    editDefaultOptionIndex,
+                    editMode.path.slice(0, -1),
+                    rows[selected].key,
+                    editMode.savedOptionIndex,
+                    true
+                  )
               : shouldShowReadOnlyOptions
                   ? React.createElement(
                       React.Fragment,

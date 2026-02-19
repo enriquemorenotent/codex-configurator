@@ -1,3 +1,5 @@
+import { getReferenceFeatureKeys } from './configReference.js';
+
 const prettifyFeatureName = (key) =>
   key
     .split('_')
@@ -195,10 +197,17 @@ const FEATURE_DEFINITION_MAP = CONFIG_FEATURE_DEFINITIONS.reduce((acc, definitio
   return acc;
 }, {});
 
-export const getConfigFeatureKeys = () =>
-  CONFIG_FEATURE_DEFINITIONS
+const DOCUMENTED_REFERENCE_FEATURE_KEYS = getReferenceFeatureKeys();
+
+export const getConfigFeatureKeys = () => {
+  if (DOCUMENTED_REFERENCE_FEATURE_KEYS.length > 0) {
+    return DOCUMENTED_REFERENCE_FEATURE_KEYS;
+  }
+
+  return CONFIG_FEATURE_DEFINITIONS
     .filter((definition) => definition.isDocumented === true)
     .map((definition) => definition.key);
+};
 
 export const getConfigFeatureDefinition = (key) => FEATURE_DEFINITION_MAP[key];
 

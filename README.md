@@ -28,8 +28,8 @@ codex-configurator
 ## Controls
 
 - `↑` `↓` : move selection
-- `Enter`: open selected table or open picker for preset values
-- `Del`: unset selected value (remove the key from `config.toml`)
+- `Enter`: open selected table; for boolean settings, toggle directly; for string settings, open inline input; for other preset values, open picker
+- `Del`: unset selected value or remove selected custom `<id>` entry from `config.toml`
 - `←` / `Backspace`: move up one level (to parent table)
 - `r`: reload `~/.codex/config.toml`
 - `q`: quit
@@ -48,10 +48,12 @@ The table view follows TOML structure, with a root catalog of common keys:
 - Unset feature flags use each feature’s documented default behavior when toggling.
 - Feature rows tagged with `[not in official list]` come from your file but are not in the curated official set.
 - Selected sections such as `history`, `tui`, `feedback`, and `shell_environment_policy` also show common unset keys.
+- Attributes and subattributes are shown in strict alphabetical order.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.
 - Arrays of tables are represented as entries you can expand into indexed rows.
+- Placeholder-based sections (for example `apps.<id>.*`) include a `+ add ...` row to create custom IDs directly from the UI.
 
 ## Configuration source
 
@@ -86,5 +88,6 @@ If the file is missing or unreadable, the TUI displays the read error and the ex
 - `src/configHelp.js`: user-facing copy for key explanations
 - `src/layout.js`: pane width and path-key helpers
 - `src/interaction.js`: input helpers
+- `src/reference/config-reference.json`: source-of-truth schema extracted from upstream config reference and used to drive which UI settings are shown
 - `.gitignore`: ignore list for Node/TUI artifacts
 - `package.json`: package metadata and scripts

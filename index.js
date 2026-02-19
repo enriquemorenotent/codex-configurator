@@ -13,6 +13,10 @@ import {
   writeConfig,
 } from './src/configParser.js';
 import { getConfigOptions } from './src/configHelp.js';
+import {
+  getReferenceOptionForPath,
+  getReferenceCustomIdPlaceholder,
+} from './src/configReference.js';
 import { pathToKey, clamp } from './src/layout.js';
 import { isBackspaceKey, isDeleteKey } from './src/interaction.js';
 import { Header } from './src/components/Header.js';
@@ -20,6 +24,30 @@ import { ConfigNavigator } from './src/components/ConfigNavigator.js';
 
 const computeListViewportHeight = (rows, terminalRows) =>
   Math.max(4, Math.min(rows.length, Math.min(20, Math.max(4, terminalRows - 14))));
+
+const isBooleanOnlyOptions = (options) =>
+  Array.isArray(options) &&
+  options.length === 2 &&
+  options.every((option) => typeof option === 'boolean') &&
+  options.includes(false) &&
+  options.includes(true);
+
+const isStringReferenceType = (type) => /^string(?:\s|$)/.test(String(type || '').trim());
+
+const isStringField = (pathSegments, value) => {
+  if (typeof value === 'string') {
+    return true;
+  }
+
+  return isStringReferenceType(getReferenceOptionForPath(pathSegments)?.type);
+};
+
+const isCustomIdTableRow = (pathSegments, row) =>
+  row?.kind === 'table' &&
+  typeof row?.pathSegment === 'string' &&
+  Boolean(getReferenceCustomIdPlaceholder(pathSegments));
+
+const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
 
 const getCodexVersion = () => {
   try {
@@ -183,6 +211,7 @@ const App = () => {
 
     setEditError('');
     setEditMode({
+      mode: 'select',
       path: targetPath,
       options,
       selectedOptionIndex: clamp(options.findIndex((option) => Object.is(option, target.value)), 0, options.length - 1),
@@ -190,8 +219,29 @@ const App = () => {
     });
   };
 
+  const beginTextEditing = (target, targetPath) => {
+    setEditError('');
+    setEditMode({
+      mode: 'text',
+      path: targetPath,
+      draftValue: typeof target.value === 'string' ? target.value : '',
+      savedValue: null,
+    });
+  };
+
+  const beginAddIdEditing = (targetPath, placeholder = 'id') => {
+    setEditError('');
+    setEditMode({
+      mode: 'add-id',
+      path: targetPath,
+      placeholder,
+      draftValue: '',
+      savedValue: null,
+    });
+  };
+
   const applyEdit = () => {
-    if (!editMode) {
+    if (!editMode || editMode.mode !== 'select') {
       return;
     }
 
@@ -210,6 +260,68 @@ const App = () => {
       path: snapshot.path,
       data: nextData,
     });
+    setEditMode(null);
+    setEditError('');
+  };
+
+  const applyTextEdit = () => {
+    if (!editMode || editMode.mode !== 'text') {
+      return;
+    }
+
+    const nextData = setValueAtPath(snapshot.ok ? snapshot.data : {}, editMode.path, editMode.draftValue);
+    const writeResult = writeConfig(nextData, snapshot.path);
+
+    if (!writeResult.ok) {
+      setEditError(writeResult.error);
+      return;
+    }
+
+    setSnapshot({
+      ok: true,
+      path: snapshot.path,
+      data: nextData,
+    });
+    setEditMode(null);
+    setEditError('');
+  };
+
+  const applyAddId = () => {
+    if (!editMode || editMode.mode !== 'add-id') {
+      return;
+    }
+
+    const nextId = String(editMode.draftValue || '').trim();
+    if (!nextId) {
+      setEditError('ID cannot be empty.');
+      return;
+    }
+
+    const nextPath = [...editMode.path, nextId];
+    const data = snapshot.ok ? snapshot.data : {};
+    const existingValue = getNodeAtPath(data, nextPath);
+
+    if (typeof existingValue !== 'undefined') {
+      setEditError(`ID "${nextId}" already exists.`);
+      return;
+    }
+
+    const nextData = setValueAtPath(data, nextPath, {});
+    const writeResult = writeConfig(nextData, snapshot.path);
+
+    if (!writeResult.ok) {
+      setEditError(writeResult.error);
+      return;
+    }
+
+    setSnapshot({
+      ok: true,
+      path: snapshot.path,
+      data: nextData,
+    });
+    setPathSegments(nextPath);
+    setSelectedIndex(0);
+    setScrollOffset(0);
     setEditMode(null);
     setEditError('');
   };
@@ -272,12 +384,52 @@ const App = () => {
   };
 
   useInput((input, key) => {
-    if (input === 'q') {
+    const isTextEditing = isInlineTextMode(editMode?.mode);
+
+    if (input === 'q' && !isTextEditing) {
       exit();
       return;
     }
 
     if (editMode) {
+      if (isInlineTextMode(editMode.mode)) {
+        if (key.return) {
+          if (editMode.mode === 'text') {
+            applyTextEdit();
+          } else {
+            applyAddId();
+          }
+          return;
+        }
+
+        if (key.escape) {
+          setEditMode(null);
+          setEditError('');
+          return;
+        }
+
+        if (isBackspaceKey(input, key) || isDeleteKey(input, key)) {
+          setEditMode((previous) => ({
+            ...previous,
+            draftValue: previous.draftValue.slice(0, -1),
+          }));
+          return;
+        }
+
+        if (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow) {
+          return;
+        }
+
+        if (!key.ctrl && !key.meta && input.length > 0) {
+          setEditMode((previous) => ({
+            ...previous,
+            draftValue: `${previous.draftValue}${input}`,
+          }));
+        }
+
+        return;
+      }
+
       if (key.upArrow) {
         setEditMode((previous) => ({
           ...previous,
@@ -345,6 +497,11 @@ const App = () => {
     if (key.return && rows[safeSelected]) {
       const target = rows[safeSelected];
 
+      if (target.kind === 'action' && target.action === 'add-custom-id') {
+        beginAddIdEditing(pathSegments, target.placeholder || 'id');
+        return;
+      }
+
       if (target.kind === 'table' || target.kind === 'tableArray') {
         const nextPath = [...pathSegments, target.pathSegment];
 
@@ -367,8 +524,18 @@ const App = () => {
 
       const targetPath = [...pathSegments, target.pathSegment];
       const options = getConfigOptions(targetPath, target.key, target.value, target.kind) || [];
-      if (typeof target.value === 'boolean') {
-        applyBooleanToggle(target, targetPath);
+      if (typeof target.value === 'boolean' || isBooleanOnlyOptions(options)) {
+        applyBooleanToggle(
+          typeof target.value === 'boolean'
+            ? target
+            : { ...target, value: false },
+          targetPath
+        );
+        return;
+      }
+
+      if (isStringField(targetPath, target.value)) {
+        beginTextEditing(target, targetPath);
         return;
       }
 
@@ -381,9 +548,10 @@ const App = () => {
     if (isDeleteKey(input, key) && rows[safeSelected]) {
       const target = rows[safeSelected];
       const isValueRow = target.kind === 'value';
+      const isCustomIdRow = isCustomIdTableRow(pathSegments, target);
       const isInsideArray = Array.isArray(currentNode);
 
-      if (!isValueRow || isInsideArray) {
+      if ((!isValueRow && !isCustomIdRow) || isInsideArray) {
         return;
       }
 
