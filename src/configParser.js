@@ -13,6 +13,7 @@ import {
   getReferenceRootDefinitions,
   getReferenceTableDefinitions,
 } from './configReference.js';
+import { logConfiguratorError } from './errorLogger.js';
 
 export const CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
 export const MAX_DETAIL_CHARS = 2200;
@@ -88,10 +89,16 @@ export const readConfig = () => {
       data,
     };
   } catch (error) {
+    const errorMessage = error?.message || 'Unable to read or parse configuration file.';
+    logConfiguratorError('config.read.failed', {
+      configPath: CONFIG_PATH,
+      error: errorMessage,
+    });
+
     return {
       ok: false,
       path: CONFIG_PATH,
-      error: error?.message || 'Unable to read or parse configuration file.',
+      error: errorMessage,
     };
   }
 };
@@ -99,17 +106,65 @@ export const readConfig = () => {
 const normalizeFilePath = (outputPath) => outputPath || CONFIG_PATH;
 
 export const writeConfig = (data, outputPath = CONFIG_PATH) => {
+  const targetPath = normalizeFilePath(outputPath);
+  const directoryPath = path.dirname(targetPath);
+  const fileName = path.basename(targetPath);
+  const tempPath = path.join(
+    directoryPath,
+    `.${fileName}.${process.pid}.${Date.now()}.tmp`
+  );
+
   try {
+    if (!fs.existsSync(targetPath)) {
+      logConfiguratorError('config.write.failed', {
+        configPath: targetPath,
+        error: `Configuration file does not exist: ${targetPath}`,
+      });
+
+      return {
+        ok: false,
+        error: `Configuration file does not exist: ${targetPath}`,
+      };
+    }
+
     const payload = stringify(data);
-    fs.writeFileSync(normalizeFilePath(outputPath), `${payload}\n`);
+    let tempFd = null;
+
+    try {
+      tempFd = fs.openSync(tempPath, 'wx', 0o600);
+      fs.writeFileSync(tempFd, `${payload}\n`, 'utf8');
+      fs.fsyncSync(tempFd);
+      fs.closeSync(tempFd);
+      tempFd = null;
+
+      fs.renameSync(tempPath, targetPath);
+    } finally {
+      if (tempFd !== null) {
+        try {
+          fs.closeSync(tempFd);
+        } catch {}
+      }
+
+      if (fs.existsSync(tempPath)) {
+        try {
+          fs.unlinkSync(tempPath);
+        } catch {}
+      }
+    }
 
     return {
       ok: true,
     };
   } catch (error) {
+    const errorMessage = error?.message || 'Unable to write configuration file.';
+    logConfiguratorError('config.write.failed', {
+      configPath: targetPath,
+      error: errorMessage,
+    });
+
     return {
       ok: false,
-      error: error?.message || 'Unable to write configuration file.',
+      error: errorMessage,
     };
   }
 };

@@ -53,7 +53,7 @@ The table view follows TOML structure, with a root catalog of common keys:
 - Selected sections such as `history`, `tui`, `feedback`, and `shell_environment_policy` also show common unset keys.
 - Attributes and subattributes are shown in strict alphabetical order.
 - Unset boolean settings display explicit defaults as `true [default]` or `false [default]`.
-- For placeholder keys like `<path>`, IDs entered in the UI are normalized under your home directory.
+- For placeholder keys like `<path>`, IDs entered in the UI are normalized under your home directory, and traversal outside home is rejected.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.
@@ -69,6 +69,8 @@ The app reads from:
 ```
 
 If the file is missing or unreadable, the TUI displays the read error and the expected path.
+Configuration writes are atomic and only apply to existing config files.
+Read/write failures are also appended to `~/.codex-configurator-errors.log`.
 
 ## Upstream reference
 
@@ -81,6 +83,10 @@ If the file is missing or unreadable, the TUI displays the read error and the ex
 - `npm run lint`: syntax check for all source files
 - `npm run build`: runs lint
 - `npm test`: runs the Node.js unit test suite (`node --test`)
+
+## Continuous integration
+
+GitHub Actions runs `npm run lint`, `npm test`, and `npm run build` on every push and pull request.
 
 ## Project structure
 

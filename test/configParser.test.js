@@ -1,12 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import * as toml from 'toml';
 import {
   MAX_DETAIL_CHARS,
   deleteValueAtPath,
   formatDetails,
   getNodeAtPath,
   setValueAtPath,
+  writeConfig,
 } from '../src/configParser.js';
+
+const withTempErrorLogPath = (callback) => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-configurator-'));
+  const logPath = path.join(tempDirectory, 'errors.log');
+  const previousLogPath = process.env.CODEX_CONFIGURATOR_ERROR_LOG_PATH;
+  process.env.CODEX_CONFIGURATOR_ERROR_LOG_PATH = logPath;
+
+  try {
+    callback({ tempDirectory, logPath });
+  } finally {
+    if (typeof previousLogPath === 'string') {
+      process.env.CODEX_CONFIGURATOR_ERROR_LOG_PATH = previousLogPath;
+    } else {
+      delete process.env.CODEX_CONFIGURATOR_ERROR_LOG_PATH;
+    }
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
+};
 
 test('getNodeAtPath resolves numeric string segments for arrays', () => {
   const root = {
@@ -90,4 +113,49 @@ test('formatDetails truncates large structured values and keeps scalar values in
   assert.equal(details.endsWith('…'), true);
   assert.equal(details.length, MAX_DETAIL_CHARS + 1);
   assert.equal(formatDetails('plain-text'), 'plain-text');
+});
+
+test('writeConfig writes atomically to an existing file path', () => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-configurator-'));
+  const configPath = path.join(tempDirectory, 'config.toml');
+  fs.writeFileSync(configPath, 'model = "gpt-4.1"\n', 'utf8');
+
+  try {
+    const result = writeConfig(
+      {
+        model: 'gpt-5',
+        features: {
+          web_search: true,
+        },
+      },
+      configPath
+    );
+
+    assert.equal(result.ok, true);
+
+    const fileContents = fs.readFileSync(configPath, 'utf8');
+    const parsed = toml.parse(fileContents);
+    assert.equal(parsed.model, 'gpt-5');
+    assert.equal(parsed.features.web_search, true);
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test('writeConfig fails when the target file does not exist', () => {
+  withTempErrorLogPath(({ tempDirectory, logPath }) => {
+    const configPath = path.join(tempDirectory, 'missing.toml');
+    const result = writeConfig({ model: 'gpt-5' }, configPath);
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /does not exist/);
+    assert.deepEqual(fs.readdirSync(tempDirectory), ['errors.log']);
+
+    const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n');
+    assert.equal(lines.length, 1);
+    const entry = JSON.parse(lines[0]);
+    assert.equal(entry.event, 'config.write.failed');
+    assert.equal(entry.configPath, configPath);
+    assert.match(entry.error, /does not exist/);
+  });
 });

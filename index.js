@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
 import React, { useState, useEffect } from 'react';
-import os from 'os';
-import path from 'path';
 import { execSync } from 'node:child_process';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
 import { CONTROL_HINT, EDIT_CONTROL_HINT } from './src/constants.js';
@@ -19,6 +17,7 @@ import {
   getReferenceOptionForPath,
   getReferenceCustomIdPlaceholder,
 } from './src/configReference.js';
+import { normalizeCustomPathId } from './src/customPathId.js';
 import { pathToKey, clamp } from './src/layout.js';
 import {
   isBackspaceKey,
@@ -57,20 +56,6 @@ const isCustomIdTableRow = (pathSegments, row) =>
   Boolean(getReferenceCustomIdPlaceholder(pathSegments));
 
 const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
-
-const normalizeCustomPathId = (value) => {
-  const trimmedValue = String(value || '').trim();
-  if (!trimmedValue) {
-    return '';
-  }
-
-  const withoutTilde = trimmedValue.startsWith('~')
-    ? trimmedValue.slice(1)
-    : trimmedValue;
-  const relativePath = withoutTilde.replace(/^[/\\]+/, '');
-
-  return path.join(os.homedir(), relativePath);
-};
 
 const getCodexVersion = () => {
   try {
@@ -316,9 +301,17 @@ const App = () => {
 
     const nextIdInput = String(editMode.draftValue || '').trim();
     const placeholder = getReferenceCustomIdPlaceholder(editMode.path);
-    const nextId = placeholder === '<path>'
-      ? normalizeCustomPathId(nextIdInput)
-      : nextIdInput;
+    let nextId = nextIdInput;
+
+    if (placeholder === '<path>') {
+      const normalizedPath = normalizeCustomPathId(nextIdInput);
+      if (!normalizedPath.ok) {
+        setEditError(normalizedPath.error);
+        return;
+      }
+
+      nextId = normalizedPath.value;
+    }
 
     if (!nextId) {
       setEditError('ID cannot be empty.');
