@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { execFile } from 'node:child_process';
+import path from 'node:path';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
 import { CONTROL_HINT, EDIT_CONTROL_HINT } from './src/constants.js';
 import {
@@ -57,6 +58,10 @@ const isCustomIdTableRow = (pathSegments, row) =>
 
 const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
 const VERSION_COMMAND_TIMEOUT_MS = 3000;
+const VERSION_DISABLED_LABEL = 'version check disabled';
+const VERSION_CHECK_ENABLED_ENV_VAR = 'CODEX_CONFIGURATOR_ENABLE_VERSION_CHECK';
+const CODEX_BIN_ENV_VAR = 'CODEX_CONFIGURATOR_CODEX_BIN';
+const NPM_BIN_ENV_VAR = 'CODEX_CONFIGURATOR_NPM_BIN';
 
 const runCommand = (command, args = []) =>
   new Promise((resolve) => {
@@ -80,8 +85,34 @@ const runCommand = (command, args = []) =>
     );
   });
 
-const getCodexVersion = async () => {
-  const output = await runCommand('codex', ['--version']);
+const getAbsoluteCommandPath = (environmentVariableName) => {
+  const configuredPath = String(process.env[environmentVariableName] || '').trim();
+  if (!configuredPath || !path.isAbsolute(configuredPath)) {
+    return '';
+  }
+
+  return configuredPath;
+};
+
+const getVersionCommands = () => {
+  if (process.env[VERSION_CHECK_ENABLED_ENV_VAR] !== '1') {
+    return null;
+  }
+
+  const codexCommand = getAbsoluteCommandPath(CODEX_BIN_ENV_VAR);
+  const npmCommand = getAbsoluteCommandPath(NPM_BIN_ENV_VAR);
+  if (!codexCommand || !npmCommand) {
+    return null;
+  }
+
+  return {
+    codexCommand,
+    npmCommand,
+  };
+};
+
+const getCodexVersion = async (codexCommand) => {
+  const output = await runCommand(codexCommand, ['--version']);
   const firstLine = output.split('\n')[0]?.trim();
 
   if (!firstLine) {
@@ -125,7 +156,16 @@ const compareVersions = (left, right) => {
 };
 
 const getCodexUpdateStatus = async () => {
-  const installedLabel = await getCodexVersion();
+  const commands = getVersionCommands();
+  if (!commands) {
+    return {
+      installed: VERSION_DISABLED_LABEL,
+      latest: 'unknown',
+      status: '',
+    };
+  }
+
+  const installedLabel = await getCodexVersion(commands.codexCommand);
   const installed = normalizeVersion(installedLabel);
 
   if (!installed) {
@@ -136,7 +176,12 @@ const getCodexUpdateStatus = async () => {
     };
   }
 
-  const latestOutput = await runCommand('npm', ['view', '@openai/codex', 'version', '--json']);
+  const latestOutput = await runCommand(commands.npmCommand, [
+    'view',
+    '@openai/codex',
+    'version',
+    '--json',
+  ]);
   const latest = normalizeVersion(latestOutput) || latestOutput.trim();
 
   if (!latest) {

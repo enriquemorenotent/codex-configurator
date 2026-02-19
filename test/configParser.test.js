@@ -9,6 +9,7 @@ import {
   deleteValueAtPath,
   formatDetails,
   getNodeAtPath,
+  resolveConfigPath,
   setValueAtPath,
   writeConfig,
 } from '../src/configParser.js';
@@ -41,6 +42,39 @@ test('getNodeAtPath resolves numeric string segments for arrays', () => {
 
   assert.equal(getNodeAtPath(root, ['providers', '1', 'name']), 'second');
   assert.equal(getNodeAtPath(root, ['providers', 0, 'name']), 'first');
+});
+
+test('resolveConfigPath falls back to home .codex path when no overrides are set', () => {
+  const resolvedPath = resolveConfigPath({
+    argv: [],
+    env: {},
+    homeDir: '/tmp/codex-home',
+  });
+
+  assert.equal(resolvedPath, '/tmp/codex-home/.codex/config.toml');
+});
+
+test('resolveConfigPath applies environment override and expands tilde paths', () => {
+  const resolvedPath = resolveConfigPath({
+    argv: [],
+    env: {
+      CODEX_CONFIGURATOR_CONFIG_PATH: '~/configs/custom.toml',
+    },
+    homeDir: '/tmp/codex-home',
+  });
+
+  assert.equal(resolvedPath, '/tmp/codex-home/configs/custom.toml');
+});
+
+test('resolveConfigPath gives CLI --config precedence over environment overrides', () => {
+  const resolvedPath = resolveConfigPath({
+    argv: ['--config', './tmp-config.toml'],
+    env: {
+      CODEX_CONFIGURATOR_CONFIG_PATH: '/tmp/codex-home/configs/env.toml',
+    },
+  });
+
+  assert.equal(resolvedPath, path.resolve('./tmp-config.toml'));
 });
 
 test('setValueAtPath updates deeply without mutating the source object', () => {

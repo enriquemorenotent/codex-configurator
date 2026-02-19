@@ -15,7 +15,10 @@ import {
 } from './configReference.js';
 import { logConfiguratorError } from './errorLogger.js';
 
-export const CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
+export const CONFIG_PATH_ENV_VAR = 'CODEX_CONFIGURATOR_CONFIG_PATH';
+const CONFIG_PATH_FLAG = '--config';
+const DEFAULT_CONFIG_FILE_SEGMENTS = ['.codex', 'config.toml'];
+export const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ...DEFAULT_CONFIG_FILE_SEGMENTS);
 export const MAX_DETAIL_CHARS = 2200;
 const MAX_ARRAY_PREVIEW_ITEMS = 3;
 const MAX_ARRAY_PREVIEW_CHARS = 52;
@@ -78,26 +81,90 @@ const formatArrayPreview = (value) => {
   return truncateText(joined, MAX_ARRAY_PREVIEW_CHARS);
 };
 
-export const readConfig = () => {
+const expandHomePath = (value, homeDir) => {
+  if (value === '~') {
+    return homeDir;
+  }
+
+  if (value.startsWith('~/') || value.startsWith('~\\')) {
+    return path.join(homeDir, value.slice(2));
+  }
+
+  return value;
+};
+
+const normalizeConfiguredPath = (value, homeDir) => {
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+  if (!normalizedValue) {
+    return '';
+  }
+
+  const expanded = expandHomePath(normalizedValue, homeDir);
+  return path.resolve(expanded);
+};
+
+const getCliConfigPath = (argv = process.argv.slice(2)) => {
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = typeof argv[index] === 'string' ? argv[index].trim() : '';
+    if (!argument) {
+      continue;
+    }
+
+    if (argument === CONFIG_PATH_FLAG) {
+      const nextArgument = argv[index + 1];
+      return typeof nextArgument === 'string' ? nextArgument : '';
+    }
+
+    if (argument.startsWith(`${CONFIG_PATH_FLAG}=`)) {
+      return argument.slice(CONFIG_PATH_FLAG.length + 1);
+    }
+  }
+
+  return '';
+};
+
+export const resolveConfigPath = ({
+  argv = process.argv.slice(2),
+  env = process.env,
+  homeDir = os.homedir(),
+} = {}) => {
+  const cliConfiguredPath = normalizeConfiguredPath(getCliConfigPath(argv), homeDir);
+  if (cliConfiguredPath) {
+    return cliConfiguredPath;
+  }
+
+  const envConfiguredPath = normalizeConfiguredPath(env?.[CONFIG_PATH_ENV_VAR], homeDir);
+  if (envConfiguredPath) {
+    return envConfiguredPath;
+  }
+
+  return path.join(homeDir, ...DEFAULT_CONFIG_FILE_SEGMENTS);
+};
+
+export const CONFIG_PATH = resolveConfigPath();
+
+export const readConfig = (configPath = CONFIG_PATH) => {
   try {
-    const fileContents = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const targetPath = configPath;
+    const fileContents = fs.readFileSync(targetPath, 'utf8');
     const data = toml.parse(fileContents);
 
     return {
       ok: true,
-      path: CONFIG_PATH,
+      path: targetPath,
       data,
     };
   } catch (error) {
+    const targetPath = configPath;
     const errorMessage = error?.message || 'Unable to read or parse configuration file.';
     logConfiguratorError('config.read.failed', {
-      configPath: CONFIG_PATH,
+      configPath: targetPath,
       error: errorMessage,
     });
 
     return {
       ok: false,
-      path: CONFIG_PATH,
+      path: targetPath,
       error: errorMessage,
     };
   }

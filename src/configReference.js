@@ -1,4 +1,7 @@
-import CONFIG_REFERENCE_DATA from './reference/config-reference.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const CONFIG_REFERENCE_DATA = require('./reference/config-reference.json');
 
 const DOCUMENT_ID = 'config.toml';
 const PLACEHOLDER_SEGMENT = /^<[^>]+>$/;

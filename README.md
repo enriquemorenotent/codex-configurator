@@ -1,7 +1,7 @@
 # Codex Configurator
 
 Codex Configurator is a terminal user interface (TUI) built with Node.js, React, and Ink.
-It shows the current contents of `~/.codex/config.toml` and can reload them on demand.
+It shows the current contents of a Codex TOML configuration file and can reload it on demand.
 
 ## Requirements
 
@@ -19,6 +19,12 @@ npm i -g codex-configurator
 codex-configurator
 ```
 
+Optional config-path override:
+
+```bash
+codex-configurator --config /path/to/config.toml
+```
+
 For local development in this repository:
 
 ```bash
@@ -34,7 +40,7 @@ npm start
 - `Enter`: open selected table; for boolean settings, toggle directly; for string settings, open inline input; for other preset values, open picker
 - `Del`: unset selected value or remove selected custom `<id>` entry from `config.toml`
 - `←` / `Backspace`: move up one level (to parent table)
-- `r`: reload `~/.codex/config.toml`
+- `r`: reload the active config file
 - `q`: quit
 
 The right-hand pane shows what each setting means, plus a picker when a value has preset options.
@@ -62,15 +68,39 @@ The table view follows TOML structure, with a root catalog of common keys:
 
 ## Configuration source
 
-The app reads from:
+By default the app reads from:
 
 ```bash
 ~/.codex/config.toml
 ```
 
-If the file is missing or unreadable, the TUI displays the read error and the expected path.
-Configuration writes are atomic and create `~/.codex/config.toml` (and parent directories) when missing.
-Read/write failures are also appended to `~/.codex-configurator-errors.log`.
+You can override this path with either:
+
+- CLI: `--config /absolute/or/relative/path.toml`
+- Env: `CODEX_CONFIGURATOR_CONFIG_PATH`
+
+Precedence is CLI first, then environment variable, then the default path.
+If the file is missing or unreadable, the TUI displays the read error and the resolved path.
+Configuration writes are atomic and create the target file (and parent directories) when missing.
+
+## Error logging
+
+Read/write failures are appended to a JSON-lines log file.
+
+- Default path: `~/.codex-configurator-errors.log`
+- Override path: `CODEX_CONFIGURATOR_ERROR_LOG_PATH`
+- Max log size before single-file rotation: `CODEX_CONFIGURATOR_ERROR_LOG_MAX_BYTES` (default `1048576`)
+
+When the log exceeds the size limit, it is rotated to `<log-path>.1` before writing the new event.
+
+## Version checks
+
+Codex version checks are disabled by default to avoid executing unknown binaries from `PATH`.
+To enable checks, all of the following must be set:
+
+- `CODEX_CONFIGURATOR_ENABLE_VERSION_CHECK=1`
+- `CODEX_CONFIGURATOR_CODEX_BIN=/absolute/path/to/codex`
+- `CODEX_CONFIGURATOR_NPM_BIN=/absolute/path/to/npm`
 
 ## Upstream reference
 
@@ -80,13 +110,13 @@ Read/write failures are also appended to `~/.codex-configurator-errors.log`.
 
 - `npm start`: run the TUI
 - `npm run dev`: same as `npm start`
-- `npm run lint`: syntax check for all source files
+- `npm run lint`: ESLint static analysis for `index.js`, `src`, and `test`
 - `npm run build`: validates the npm package archive (`npm pack --dry-run --ignore-scripts --cache .npm-cache`)
 - `npm test`: runs the Node.js unit test suite (`node --test`)
 
 ## Continuous integration
 
-GitHub Actions runs `npm run lint`, `npm test`, `npm run build`, and `npm pack --dry-run` on every push and pull request across:
+GitHub Actions runs production dependency audit (`npm audit --omit=dev --audit-level=high`), `npm run lint`, `npm test`, `npm run build`, and `npm pack --dry-run` on every push and pull request across:
 
 - `ubuntu-latest`, `macos-latest`, and `windows-latest`
 - Node.js `18` and `20`

@@ -1,6 +1,6 @@
 {
 	"name": "codex-configurator",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "TOML-aware Ink TUI for Codex Configurator",
 	"main": "index.js",
 	"type": "module",
@@ -21,7 +21,7 @@
 	"scripts": {
 		"start": "node index.js",
 		"dev": "node index.js",
-		"lint": "node --check index.js src/*.js src/components/*.js",
+		"lint": "eslint index.js src test --max-warnings=0",
 		"build": "npm pack --dry-run --ignore-scripts --cache .npm-cache",
 		"test": "node --test",
 		"prepack": "npm run lint && npm test"
@@ -38,5 +38,8 @@
 		"ink": "^6.2.1",
 		"react": "^19.0.0",
 		"toml": "^3.0.0"
+	},
+	"devDependencies": {
+		"eslint": "^8.57.1"
 	}
 }

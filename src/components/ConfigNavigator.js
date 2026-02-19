@@ -7,7 +7,7 @@ import {
   getConfigDefaultOption,
 } from '../configHelp.js';
 import { computePaneWidths, clamp } from '../layout.js';
-import { getNodeAtPath, buildRows, formatDetails } from '../configParser.js';
+import { getNodeAtPath, buildRows } from '../configParser.js';
 
 const MenuItem = ({ isSelected, isDimmed, isDeprecated, label }) =>
   React.createElement(
