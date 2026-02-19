@@ -10,7 +10,7 @@ const WORDMARK = [
   ' ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝     ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝',
 ];
 
-export const Header = ({ codexVersion, codexVersionStatus }) =>
+export const Header = ({ codexVersion, codexVersionStatus, packageVersion }) =>
   React.createElement(
     Box,
     {
@@ -20,14 +20,34 @@ export const Header = ({ codexVersion, codexVersionStatus }) =>
     },
       React.createElement(
         Box,
-        { flexDirection: 'column', marginBottom: 1, gap: 0 },
-        ...WORDMARK.map((line, index) =>
-          React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${index}` }, line)
-        )
-      ),
+        { flexDirection: 'row', marginBottom: 1, gap: 0, alignItems: 'flex-end' },
+        React.createElement(
+          Box,
+          { flexDirection: 'column' },
+          ...WORDMARK.map((line, index) =>
+            React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${index}` }, line)
+          )
+        ),
+      React.createElement(
+        Box,
+        { marginLeft: 1 },
+        React.createElement(Text, { color: 'gray', bold: true }, `v${packageVersion || 'unknown'}`)
+      )
+    ),
     React.createElement(
-      Text,
-      { color: 'gray' },
-      codexVersionStatus ? `Codex ${codexVersion} (${codexVersionStatus})` : `Codex ${codexVersion}`
+      Box,
+      { flexDirection: 'row' },
+      React.createElement(Text, { color: 'gray' }, `Codex ${codexVersion}`),
+      codexVersionStatus
+        ? codexVersionStatus === 'up to date'
+          ? React.createElement(
+              React.Fragment,
+              null,
+              React.createElement(Text, { color: 'gray' }, ' ('),
+              React.createElement(Text, { color: 'green' }, '✓'),
+              React.createElement(Text, { color: 'gray' }, ` ${codexVersionStatus})`)
+            )
+          : React.createElement(Text, { color: 'gray' }, ` (${codexVersionStatus})`)
+        : null
     )
   );

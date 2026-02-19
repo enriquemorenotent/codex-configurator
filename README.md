@@ -47,6 +47,7 @@ The right-hand pane shows what each setting means, plus a picker when a value ha
 Deprecated settings are marked with a `[!]` warning marker; only that marker is highlighted.
 Model picker entries are curated presets maintained by this project.
 In select lists, `[default]` marks the default option.
+The header banner shows the configurator package version (for example `v0.2.1`) next to the wordmark.
 
 ## TOML-aware navigation
 
@@ -96,12 +97,12 @@ When the log exceeds the size limit, it is rotated to `<log-path>.1` before writ
 
 ## Version checks
 
-Codex version checks are disabled by default to avoid executing unknown binaries from `PATH`.
-To enable checks, all of the following must be set:
+Codex version checks are always enabled.
+By default, the app runs global `codex` and `npm` from `PATH`.
+You can override either command with:
 
-- `CODEX_CONFIGURATOR_ENABLE_VERSION_CHECK=1`
-- `CODEX_CONFIGURATOR_CODEX_BIN=/absolute/path/to/codex`
-- `CODEX_CONFIGURATOR_NPM_BIN=/absolute/path/to/npm`
+- `CODEX_CONFIGURATOR_CODEX_BIN=<command-or-path>`
+- `CODEX_CONFIGURATOR_NPM_BIN=<command-or-path>`
 
 ## Upstream reference
 
