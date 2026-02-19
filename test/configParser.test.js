@@ -190,3 +190,31 @@ test('writeConfig creates missing parent directories and target file', () => {
     assert.equal(fs.existsSync(logPath), false);
   });
 });
+
+test('writeConfig writes empty <path> custom IDs as explicit tables', () => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-configurator-'));
+  const configPath = path.join(tempDirectory, 'config.toml');
+
+  try {
+    const projectPath = '/home/tester/lol';
+    const result = writeConfig(
+      {
+        projects: {
+          [projectPath]: {},
+        },
+      },
+      configPath
+    );
+
+    assert.equal(result.ok, true);
+
+    const fileContents = fs.readFileSync(configPath, 'utf8');
+    assert.match(fileContents, /\[projects\."\/home\/tester\/lol"\]/);
+    assert.doesNotMatch(fileContents, /"\/home\/tester\/lol"\s*=\s*\{\s*\}/);
+
+    const parsed = toml.parse(fileContents);
+    assert.deepEqual(Object.keys(parsed.projects[projectPath]), []);
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
+});

@@ -1,6 +1,6 @@
 {
 	"name": "codex-configurator",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "TOML-aware Ink TUI for Codex Configurator",
 	"main": "index.js",
 	"type": "module",
@@ -15,6 +15,15 @@
 	],
 	"author": "Codex Configurator",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/enriquemorenotent/codex-configurator.git"
+	},
+	"homepage": "https://github.com/enriquemorenotent/codex-configurator#readme",
+	"bugs": {
+		"url": "https://github.com/enriquemorenotent/codex-configurator/issues"
+	},
+	"funding": "https://github.com/sponsors/enriquemorenotent",
 	"bin": {
 		"codex-configurator": "index.js"
 	},
@@ -29,6 +38,7 @@
 	"engines": {
 		"node": ">=18"
 	},
+	"packageManager": "npm@10.9.4",
 	"files": [
 		"index.js",
 		"src"

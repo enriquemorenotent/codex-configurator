@@ -171,6 +171,32 @@ export const readConfig = (configPath = CONFIG_PATH) => {
 };
 
 const normalizeFilePath = (outputPath) => outputPath || CONFIG_PATH;
+const EMPTY_PATH_TABLE_MARKER_KEY = '__codex_configurator_empty_path_table_marker__';
+
+const cloneForTomlWrite = (value, pathSegments = []) => {
+  if (Array.isArray(value)) {
+    return value.map((item, index) => cloneForTomlWrite(item, [...pathSegments, String(index)]));
+  }
+
+  if (!isPlainObject(value)) {
+    return value;
+  }
+
+  const customPlaceholder = getReferenceCustomIdPlaceholder(pathSegments);
+  const clonedEntries = Object.entries(value).map(([key, child]) => {
+    if (
+      customPlaceholder === '<path>' &&
+      isPlainObject(child) &&
+      Object.keys(child).length === 0
+    ) {
+      return [key, { [EMPTY_PATH_TABLE_MARKER_KEY]: undefined }];
+    }
+
+    return [key, cloneForTomlWrite(child, [...pathSegments, key])];
+  });
+
+  return Object.fromEntries(clonedEntries);
+};
 
 export const writeConfig = (data, outputPath = CONFIG_PATH) => {
   const targetPath = normalizeFilePath(outputPath);
@@ -186,7 +212,7 @@ export const writeConfig = (data, outputPath = CONFIG_PATH) => {
       fs.mkdirSync(directoryPath, { recursive: true, mode: 0o700 });
     }
 
-    const payload = stringify(data);
+    const payload = stringify(cloneForTomlWrite(data));
     let tempFd = null;
 
     try {

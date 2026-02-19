@@ -60,6 +60,7 @@ The table view follows TOML structure, with a root catalog of common keys:
 - Attributes and subattributes are shown in strict alphabetical order.
 - Unset boolean settings display explicit defaults as `true [default]` or `false [default]`.
 - For placeholder keys like `<path>`, IDs entered in the UI are normalized under your home directory, and traversal outside home is rejected.
+- New `<path>` entries are written as explicit tables (for example `[projects."/home/me/repo"]`) instead of inline empty objects.
 
 - Dotted/table sections become navigable table nodes.
 - Inline key-value pairs are shown as leaf entries.
