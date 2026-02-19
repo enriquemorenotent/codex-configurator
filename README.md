@@ -10,19 +10,20 @@ It shows the current contents of `~/.codex/config.toml` and can reload them on d
 ## Install
 
 ```bash
-npm install
+npm i -g codex-configurator
 ```
 
 ## Usage
 
 ```bash
-npm start
+codex-configurator
 ```
 
-To run directly from an installed package:
+For local development in this repository:
 
 ```bash
-codex-configurator
+npm install
+npm start
 ```
 
 ## Controls

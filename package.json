@@ -1,7 +1,6 @@
 {
   "name": "codex-configurator",
   "version": "0.1.0",
-  "private": true,
   "description": "TOML-aware Ink TUI for Codex Configurator",
   "main": "index.js",
   "type": "module",
