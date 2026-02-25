@@ -41,6 +41,59 @@ const isObject = (value) =>
 const isPrimitiveValue = (type) =>
   type === 'string' || type === 'number' || type === 'integer' || type === 'boolean';
 
+const isObjectLikeReference = (schema) => {
+  if (!schema || typeof schema !== 'object') {
+    return false;
+  }
+
+  if (Array.isArray(schema.type) && schema.type.includes('object')) {
+    return true;
+  }
+
+  if (schema.type === 'object') {
+    return true;
+  }
+
+  if (schema.properties || schema.additionalProperties || schema.patternProperties) {
+    return true;
+  }
+
+  if (Array.isArray(schema.oneOf) || Array.isArray(schema.allOf) || Array.isArray(schema.anyOf)) {
+    return true;
+  }
+
+  return false;
+};
+
+const isScalarLikeReference = (schema) => {
+  if (!schema || typeof schema !== 'object') {
+    return false;
+  }
+
+  if (isObjectLikeReference(schema)) {
+    return false;
+  }
+
+  if (Array.isArray(schema.type) && schema.type.length > 0) {
+    return schema.type.some(isPrimitiveValue);
+  }
+
+  if (isPrimitiveValue(normalizeType(schema.type))) {
+    return true;
+  }
+
+  return Array.isArray(schema.enum);
+};
+
+const getOneOfTypeLabel = (branches, context) => {
+  const unique = [...new Set(branches.map((branch) => getTypeLabel(branch, context)).filter(Boolean))];
+  if (unique.length === 0) {
+    return 'value';
+  }
+
+  return unique.length === 1 ? unique[0] : unique.join(' | ');
+};
+
 const getPlaceholderForSegment = (segment, fallback = ROOT_PLACEHOLDER) =>
   segment && KEY_SEGMENT_PLACEHOLDERS[segment] ? KEY_SEGMENT_PLACEHOLDERS[segment] : fallback;
 
@@ -322,12 +375,40 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
   }
 
   if (Array.isArray(normalized.oneOf)) {
-    const branchDescriptions = normalized.oneOf.map((branch) => {
-      const branchNormalized = normalizeDefinition(branch, context.definitions);
-      if (branchNormalized?.type === 'object' && branchNormalized?.properties) {
-        return mapBranchTypeLabel(branchNormalized, context);
+    const branchSchemas = normalized.oneOf.map((branch) =>
+      normalizeDefinition(branch, context.definitions)
+    );
+    const scalarBranches = branchSchemas.filter(isScalarLikeReference);
+    const objectBranches = branchSchemas.filter(isObjectLikeReference);
+
+    if (scalarBranches.length > 0 && objectBranches.length > 0) {
+      const scalarTypeLabel = getOneOfTypeLabel(scalarBranches, context);
+      const scalarEnumValues = scalarBranches.flatMap((branch) =>
+        Array.isArray(branch.enum) ? branch.enum : []
+      );
+      if (normalizedPath.length > 0) {
+        const scalarSchema = {
+          ...normalized,
+          enum: scalarEnumValues,
+          type: scalarTypeLabel,
+        };
+        addReferenceOption(
+          optionsByKey,
+          normalizedPath,
+          scalarSchema,
+          context,
+          { type: scalarTypeLabel }
+        );
       }
-      return getTypeLabel(branchNormalized, context);
+
+      return;
+    }
+
+    const branchDescriptions = branchSchemas.map((branch) => {
+      if (branch?.type === 'object' && branch?.properties) {
+        return mapBranchTypeLabel(branch, context);
+      }
+      return getTypeLabel(branch, context);
     });
     const unique = [...new Set(branchDescriptions)];
     if (normalizedPath.length > 0) {

@@ -481,7 +481,7 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
     }
 
     const value = node[definition.key];
-    const kind = getNodeKind(value);
+    const kind = definition.kind === 'value' ? 'value' : getNodeKind(value);
     rows.push({
       key: definition.key,
       kind,
