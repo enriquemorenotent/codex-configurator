@@ -119,9 +119,11 @@ This uses the `npm` command from `PATH` (or `CODEX_CONFIGURATOR_NPM_BIN` if set)
 
 ## Upstream reference
 
-- Codex configuration reference: https://developers.openai.com/codex/config-reference/
-- Snapshot currently synced against Codex `rust-v0.105.0` reference updates (published 2026-02-25).
-- Reference sync is intentionally manual and review-driven; this repo does not run automated remote-content sync scripts.
+- Canonical config schema: https://developers.openai.com/codex/config-schema.json
+- The local menu reads directly from `src/reference/config-schema.json`, which is downloaded from the canonical schema.
+- To refresh the reference snapshot after a new stable Codex release:
+  - `npm run sync:reference`
+- Snapshot currently synced against Codex stable reference updates published on 2026-02-25.
 - Release notes and change history: `CHANGELOG.md`
 
 ## Scripts
@@ -132,6 +134,7 @@ This uses the `npm` command from `PATH` (or `CODEX_CONFIGURATOR_NPM_BIN` if set)
 - `npm run lint`: ESLint static analysis for `index.js`, `src`, and `test`
 - `npm run build`: validates the npm package archive (`npm pack --dry-run --ignore-scripts --cache .npm-cache`)
 - `npm test`: runs the Node.js unit test suite (`node --test`)
+- `npm run sync:reference`: downloads the latest `config-schema.json` into `src/reference/config-schema.json`
 
 ## Continuous integration
 
@@ -151,6 +154,6 @@ GitHub Actions runs production dependency audit (`npm audit --omit=dev --audit-l
 - `src/configHelp.js`: user-facing copy for key explanations
 - `src/layout.js`: pane width and path-key helpers
 - `src/interaction.js`: input helpers
-- `src/reference/config-reference.json`: source-of-truth schema extracted from upstream config reference and used to drive which UI settings are shown
+- `src/reference/config-schema.json`: downloaded canonical schema used directly by the UI menu
 - `.gitignore`: ignore list for Node/TUI artifacts
 - `package.json`: package metadata and scripts
