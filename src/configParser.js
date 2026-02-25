@@ -4,6 +4,10 @@ import path from 'path';
 import * as toml from 'toml';
 import { stringify } from '@iarna/toml';
 import {
+  getConfigDefaultOption,
+  getConfigOptions,
+} from './configHelp.js';
+import {
   getConfigFeatureDefinition,
   getConfigFeatureKeys,
 } from './configFeatures.js';
@@ -383,7 +387,7 @@ const getBooleanReferenceDefault = (pathSegments, key) => {
   return inferBooleanDefaultFromDescription(referenceOption?.description);
 };
 
-const formatMissingDefinitionLabel = (definition, pathSegments) => {
+const formatMissingDefinitionLabel = (definition, pathSegments, defaultOptionValue) => {
   if (definition.kind === 'table') {
     return `${definition.key} /`;
   }
@@ -391,6 +395,10 @@ const formatMissingDefinitionLabel = (definition, pathSegments) => {
   const booleanDefault = getBooleanReferenceDefault(pathSegments, definition.key);
   if (booleanDefault !== null) {
     return `${definition.key} = ${String(booleanDefault)} [default]`;
+  }
+
+  if (typeof defaultOptionValue !== 'undefined') {
+    return `${definition.key} = ${previewValue(defaultOptionValue)} [default]`;
   }
 
   const referenceOption = getReferenceOptionForPath([...pathSegments, String(definition.key)]);
@@ -458,6 +466,18 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
 
     if (!isConfigured) {
       const booleanDefault = getBooleanReferenceDefault(pathSegments, definition.key);
+      const options = getConfigOptions(
+        [...pathSegments, definition.key],
+        definition.key,
+        undefined,
+        definition.kind
+      );
+      const configDefault = getConfigDefaultOption(
+        pathSegments,
+        definition.key,
+        definition.kind,
+        options
+      );
       const value =
         definition.kind === 'table'
           ? {}
@@ -465,15 +485,20 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
             ? []
             : booleanDefault !== null
               ? booleanDefault
-              : undefined;
+              : configDefault;
+      const isDefaultValue = typeof configDefault !== 'undefined' && booleanDefault === null;
 
       rows.push({
         key: definition.key,
         kind: definition.kind,
         value,
         pathSegment: definition.key,
-        label: formatMissingDefinitionLabel(definition, pathSegments),
-        preview: booleanDefault !== null ? `${String(booleanDefault)} [default]` : 'default',
+        label: formatMissingDefinitionLabel(definition, pathSegments, isDefaultValue ? value : undefined),
+        preview: booleanDefault !== null
+          ? `${String(booleanDefault)} [default]`
+          : isDefaultValue
+            ? `${previewValue(value)} [default]`
+            : 'default',
         isConfigured: false,
         isDeprecated: Boolean(definition.isDeprecated) || isPathDeprecated(pathSegments, definition.key),
       });

@@ -413,10 +413,20 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
     const unique = [...new Set(branchDescriptions)];
     if (normalizedPath.length > 0) {
       const typeLabel = unique.length === 1 ? unique[0] : unique.join(' | ');
+      const scalarEnumValues = branchSchemas
+        .flatMap((branch) => (Array.isArray(branch.enum) ? branch.enum : []))
+        .filter(
+          (value, index, values) =>
+            values.findIndex((item) => Object.is(item, value)) === index
+        );
+
       addReferenceOption(
         optionsByKey,
         normalizedPath,
-        { ...normalized },
+        {
+          ...normalized,
+          ...(scalarEnumValues.length > 0 ? { enum: scalarEnumValues } : {}),
+        },
         context,
         { type: typeLabel }
       );
