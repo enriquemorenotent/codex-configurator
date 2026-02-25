@@ -128,6 +128,7 @@ This uses the `npm` command from `PATH` (or `CODEX_CONFIGURATOR_NPM_BIN` if set)
 
 - `npm start`: run the TUI
 - `npm run dev`: same as `npm start`
+- `npm run dev:scratch`: run the TUI against a temporary copy (`.codex-configurator.scratch.toml`) in the project folder
 - `npm run lint`: ESLint static analysis for `index.js`, `src`, and `test`
 - `npm run build`: validates the npm package archive (`npm pack --dry-run --ignore-scripts --cache .npm-cache`)
 - `npm test`: runs the Node.js unit test suite (`node --test`)
