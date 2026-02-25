@@ -313,6 +313,43 @@ const mergeEnumValues = (base = [], added = []) => {
   return next;
 };
 
+const mergeEnumDescriptions = (base = {}, added = {}) => {
+  const next = { ...base };
+  if (!added || typeof added !== 'object') {
+    return next;
+  }
+
+  Object.entries(added).forEach(([enumValue, description]) => {
+    const key = String(enumValue);
+    if (!Object.prototype.hasOwnProperty.call(next, key) || String(next[key]).trim() === '') {
+      next[key] = String(description || '').trim();
+    }
+  });
+
+  return next;
+};
+
+const getOneOfEnumDescriptions = (branches) => {
+  const mapped = {};
+  if (!Array.isArray(branches)) {
+    return mapped;
+  }
+
+  branches.forEach((branch) => {
+    const description = String(branch?.description || '').trim();
+    if (!description) {
+      return;
+    }
+
+    const enumValues = Array.isArray(branch?.enum) ? branch.enum : [];
+    enumValues.forEach((value) => {
+      mapped[String(value)] = description;
+    });
+  });
+
+  return mapped;
+};
+
 const mergeOptionType = (current, next) => {
   if (!current) {
     return next;
@@ -341,6 +378,9 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
   const enumValues = Array.isArray(schema?.enum)
     ? schema.enum.map((value) => String(value))
     : [];
+  const enumOptionDescriptions = {
+    ...(overrides.enumOptionDescriptions || {}),
+  };
 
   if (!existing) {
     optionsByKey.set(key, {
@@ -349,6 +389,7 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
       type: typeLabel,
       enum_values: enumValues,
       enumValues: enumValues,
+      enumOptionDescriptions,
       description,
       deprecated: schema?.deprecated === true,
     });
@@ -358,6 +399,10 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
   existing.type = mergeOptionType(existing.type, typeLabel);
   existing.enum_values = mergeEnumValues(existing.enum_values, enumValues);
   existing.enumValues = mergeEnumValues(existing.enumValues, enumValues);
+  existing.enumOptionDescriptions = mergeEnumDescriptions(
+    existing.enumOptionDescriptions,
+    enumOptionDescriptions
+  );
   if (!existing.description && description) {
     existing.description = description;
   }
@@ -378,6 +423,7 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
     const branchSchemas = normalized.oneOf.map((branch) =>
       normalizeDefinition(branch, context.definitions)
     );
+    const enumDescriptionsByValue = getOneOfEnumDescriptions(branchSchemas);
     const scalarBranches = branchSchemas.filter(isScalarLikeReference);
     const objectBranches = branchSchemas.filter(isObjectLikeReference);
 
@@ -397,7 +443,10 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
           normalizedPath,
           scalarSchema,
           context,
-          { type: scalarTypeLabel }
+          {
+            type: scalarTypeLabel,
+            enumOptionDescriptions: enumDescriptionsByValue,
+          }
         );
       }
 
@@ -428,7 +477,10 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
           ...(scalarEnumValues.length > 0 ? { enum: scalarEnumValues } : {}),
         },
         context,
-        { type: typeLabel }
+        {
+          type: typeLabel,
+          enumOptionDescriptions: enumDescriptionsByValue,
+        }
       );
     }
 

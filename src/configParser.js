@@ -312,7 +312,7 @@ const buildFeatureRows = (node) => {
       : false;
     const value = isConfigured ? node[key] : defaultValue;
     const preview = isConfigured ? previewValue(value) : `${String(defaultValue)} [default]`;
-    const isDeprecated = Boolean(definition?.deprecation);
+    const isDeprecated = false;
 
     seenKeys.add(key);
     rows.push({
@@ -323,7 +323,7 @@ const buildFeatureRows = (node) => {
       label: `${key} = ${preview}`,
       preview,
       isConfigured,
-      isDeprecated,
+          isDeprecated,
       isDocumented: true,
     });
   });
@@ -346,7 +346,7 @@ const buildFeatureRows = (node) => {
           label: `${key} = ${preview} [not in official list]`,
           preview,
           isConfigured: true,
-          isDeprecated: Boolean(definition?.deprecation),
+          isDeprecated: false,
           isDocumented: false,
         };
       }),
@@ -416,8 +416,7 @@ const formatRowLabel = (key, kind, value) =>
       ? `${key} / [array:${value.length}]`
       : `${key} = ${previewValue(value)}`;
 
-const isPathDeprecated = (pathSegments, key) =>
-  Boolean(getReferenceOptionForPath([...pathSegments, String(key)])?.deprecated);
+const isPathDeprecated = () => false;
 
 const sortRowsAlphabetically = (rows) =>
   [...rows].sort((left, right) => String(left.key).localeCompare(String(right.key)));
@@ -500,7 +499,7 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
             ? `${previewValue(value)} [default]`
             : 'default',
         isConfigured: false,
-        isDeprecated: Boolean(definition.isDeprecated) || isPathDeprecated(pathSegments, definition.key),
+        isDeprecated: false,
       });
       return;
     }
@@ -515,7 +514,7 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
       label: formatRowLabel(definition.key, kind, value),
       preview: previewValue(value),
       isConfigured: true,
-      isDeprecated: Boolean(definition.isDeprecated) || isPathDeprecated(pathSegments, definition.key),
+      isDeprecated: false,
     });
   });
 
@@ -536,7 +535,7 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
           label: formatRowLabel(key, kind, value),
           preview: previewValue(value),
           isConfigured: true,
-          isDeprecated: isPathDeprecated(pathSegments, key),
+          isDeprecated: false,
         };
       }),
   ]);

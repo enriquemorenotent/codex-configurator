@@ -163,10 +163,6 @@ const buildInferredSectionHelp = (segments, key) => {
 };
 
 const getReferenceUsage = (entry) => {
-  if (entry.deprecated) {
-    return 'This option is deprecated in the official configuration reference.';
-  }
-
   if (entry.enumValues.length > 0) {
     return null;
   }
@@ -198,7 +194,6 @@ const buildReferenceHelp = (entry) => {
   return {
     short: entry.description || 'Official configuration option.',
     usage: getReferenceUsage(entry),
-    deprecation: entry.deprecated ? entry.description : undefined,
   };
 };
 
@@ -216,8 +211,7 @@ export const getConfigHelp = (segments, key) => {
     if (referenceHelp) {
       return {
         ...referenceHelp,
-        usage: featureDefinition?.deprecation || referenceHelp.usage || featureDefinition?.usage || null,
-        deprecation: featureDefinition?.deprecation || referenceHelp.deprecation,
+        usage: referenceHelp.usage || featureDefinition?.usage || null,
       };
     }
 
@@ -271,6 +265,12 @@ export const getConfigOptionExplanation = (segments, key, option) => {
   const context = getContextEntry(segments, key, CONFIG_PATH_OPTIONS);
   if (context?.explanations) {
     return context.explanations[String(option)] || null;
+  }
+
+  const referenceEntry = getReferenceOptionForPath(makePathSegments(segments, key));
+  const enumDescription = referenceEntry?.enumOptionDescriptions?.[String(option)];
+  if (enumDescription) {
+    return enumDescription;
   }
 
   return CONFIG_OPTION_EXPLANATIONS[key]?.[String(option)] || null;

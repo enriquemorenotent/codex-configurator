@@ -151,10 +151,9 @@ const renderEditableOptions = (
     const optionValueText = formatOptionValue(option);
     const prefix = showCursor && optionIndex === selectedOptionIndex ? '▶ ' : '  ';
     const valueText = `${prefix}${optionValueText}`;
-    const explanation = getConfigOptionExplanation(optionPathSegments, rowKey, option);
     const isDefault = optionIndex === defaultOptionIndex;
     const highlightDefault = selectedOptionIndex < 0 && isDefault;
-    return { optionIndex, valueText, explanation, optionValueText, isDefault, highlightDefault };
+    return { optionIndex, valueText, optionValueText, isDefault, highlightDefault };
   });
 
   const valueWidth = optionRows.reduce((max, item) => Math.max(max, item.valueText.length), 0);
@@ -163,7 +162,7 @@ const renderEditableOptions = (
     React.Fragment,
     null,
     ...optionRows.map(
-      ({ optionIndex, valueText, explanation, optionValueText, isDefault, highlightDefault }) =>
+      ({ optionIndex, valueText, optionValueText, isDefault, highlightDefault }) =>
       React.createElement(
         Box,
         {
@@ -187,9 +186,6 @@ const renderEditableOptions = (
             },
             `${valueText.padEnd(valueWidth, ' ')}`
           ),
-          explanation
-            ? React.createElement(Text, { color: 'gray' }, `  — ${truncate(explanation, 100)}`)
-            : null,
           isDefault
             ? React.createElement(Text, { color: 'cyan' }, '  [default]')
             : null
@@ -230,24 +226,14 @@ const formatConfigHelp = (pathSegments, row) => {
         : 'This setting affects Codex behavior.';
   const short = info?.short || defaultCollectionText;
   const usage = isSectionRow ? null : info?.usage;
-  const isWarning = Boolean(info?.deprecation);
   const lines = [{ text: short, color: 'white', bold: false, showWarningIcon: false }];
 
   if (usage) {
     lines.push({
-      text: isWarning ? usage.replace(/^\[!\]\s*/, '') : usage,
+      text: usage,
       color: 'gray',
       bold: false,
-      showWarningIcon: isWarning,
-    });
-  }
-
-  if (row?.key === 'approval_policy' && row?.value === 'on-failure') {
-    lines.push({
-      text: 'approval_policy = "on-failure" is deprecated; use "untrusted", "on-request", or "never".',
-      color: 'gray',
-      bold: false,
-      showWarningIcon: true,
+      showWarningIcon: false,
     });
   }
 
@@ -335,6 +321,61 @@ export const ConfigNavigator = ({
   const editDefaultOptionIndex = editMode && editMode.mode === 'select'
     ? editMode.options.findIndex((option) => Object.is(option, editDefaultOption))
     : -1;
+  const hoveredOption = editMode && editMode.mode === 'select'
+    ? editMode.options[editMode.selectedOptionIndex]
+    : shouldShowReadOnlyOptions && readOnlyOptionIndex >= 0
+      ? readOnlyOptions[readOnlyOptionIndex]
+      : null;
+  const hoveredOptionSegments =
+    editMode && editMode.mode === 'select'
+      ? editMode.path.slice(0, -1)
+      : selectedPath;
+  const hoveredOptionDescription = hoveredOption !== null && hoveredOption !== undefined
+    ? getConfigOptionExplanation(hoveredOptionSegments, selectedRow?.key, hoveredOption)
+    : null;
+  const configHelp = formatConfigHelp(pathSegments, rows[selected]);
+  const hoveredOptionDescriptionLine = hoveredOptionDescription
+    ? React.createElement(
+        Text,
+        { color: 'gray', key: 'hovered-option-description' },
+        `${formatOptionValue(hoveredOption)}: ${hoveredOptionDescription}`
+      )
+    : null;
+  const hoveredOptionDescriptionSpacer = hoveredOptionDescriptionLine
+    ? React.createElement(Text, { key: 'hovered-option-description-spacer', color: 'gray' }, ' ')
+    : null;
+  const optionSelector = editMode
+    ? editMode.mode === 'text'
+      ? renderTextEditor(editMode.draftValue)
+      : editMode.mode === 'add-id'
+        ? renderIdEditor(editMode.placeholder, editMode.draftValue)
+        : renderEditableOptions(
+            editMode.options,
+            editMode.selectedOptionIndex,
+            editDefaultOptionIndex,
+            editMode.path.slice(0, -1),
+            rows[selected].key,
+            editMode.savedOptionIndex,
+            true
+          )
+    : shouldShowReadOnlyOptions
+      ? React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(Text, { color: 'gray' }, ' '),
+          renderEditableOptions(
+            readOnlyOptions,
+            readOnlyOptionIndex,
+            readOnlyDefaultOptionIndex,
+            selectedPath,
+            selectedRow?.key,
+            null,
+            false
+          )
+        )
+      : rows[selected].kind === 'array'
+        ? renderArrayDetails(rows[selected].value)
+        : null;
 
   return React.createElement(
     Box,
@@ -371,7 +412,7 @@ export const ConfigNavigator = ({
                     label,
                     isSelected,
                     isDimmed: !isSelected && row.isConfigured === false,
-                    isDeprecated: row.isDeprecated,
+                    isDeprecated: false,
                     key: `left-${index}`,
                   }
                 );
@@ -422,7 +463,7 @@ export const ConfigNavigator = ({
                       `Filter: ${filterQuery || ''} (${rows.length}/${allRows.length})${isFilterEditing ? ' [editing]' : ''}`
                     )
                   : null,
-                ...formatConfigHelp(pathSegments, rows[selected]).map((line, lineIndex) =>
+                ...configHelp.map((line, lineIndex) =>
                   React.createElement(
                     Text,
                     {
@@ -438,38 +479,9 @@ export const ConfigNavigator = ({
                 ),
               editError ? React.createElement(Text, { color: 'red' }, editError) : null,
               editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
-              editMode
-                ? editMode.mode === 'text'
-                  ? renderTextEditor(editMode.draftValue)
-                  : editMode.mode === 'add-id'
-                    ? renderIdEditor(editMode.placeholder, editMode.draftValue)
-                  : renderEditableOptions(
-                      editMode.options,
-                      editMode.selectedOptionIndex,
-                      editDefaultOptionIndex,
-                      editMode.path.slice(0, -1),
-                      rows[selected].key,
-                      editMode.savedOptionIndex,
-                      true
-                    )
-                : shouldShowReadOnlyOptions
-                    ? React.createElement(
-                        React.Fragment,
-                        null,
-                        React.createElement(Text, { color: 'gray' }, ' '),
-                        renderEditableOptions(
-                          readOnlyOptions,
-                          readOnlyOptionIndex,
-                          readOnlyDefaultOptionIndex,
-                          selectedPath,
-                          selectedRow?.key,
-                          null,
-                          false
-                        )
-                      )
-                    : rows[selected].kind === 'array'
-                        ? renderArrayDetails(rows[selected].value)
-                        : null
+              optionSelector,
+              hoveredOptionDescriptionSpacer,
+              hoveredOptionDescriptionLine
             )
       )
   );
