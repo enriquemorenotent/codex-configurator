@@ -5,7 +5,6 @@ const CONFIG_REFERENCE_DATA = require('./reference/config-reference.json');
 
 const DOCUMENT_ID = 'config.toml';
 const PLACEHOLDER_SEGMENT = /^<[^>]+>$/;
-const NON_DEPRECATED_KEYS = new Set(['approval_policy']);
 const KIND_PRIORITY = {
   value: 1,
   array: 2,
@@ -93,7 +92,7 @@ const referenceOptions = Array.isArray(configDocument?.options)
           ? option.enum_values.map((value) => String(value))
           : [],
         description: String(option?.description || ''),
-        deprecated: option?.deprecated === true && !NON_DEPRECATED_KEYS.has(key),
+        deprecated: option?.deprecated === true,
       };
     })
   : [];

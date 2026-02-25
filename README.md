@@ -120,6 +120,9 @@ This uses the `npm` command from `PATH` (or `CODEX_CONFIGURATOR_NPM_BIN` if set)
 ## Upstream reference
 
 - Codex configuration reference: https://developers.openai.com/codex/config-reference/
+- Snapshot currently synced against Codex `rust-v0.105.0` reference updates (published 2026-02-25).
+- Reference sync is intentionally manual and review-driven; this repo does not run automated remote-content sync scripts.
+- Release notes and change history: `CHANGELOG.md`
 
 ## Scripts
 

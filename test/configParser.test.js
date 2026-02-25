@@ -6,6 +6,7 @@ import path from 'node:path';
 import * as toml from 'toml';
 import {
   MAX_DETAIL_CHARS,
+  buildRows,
   deleteValueAtPath,
   formatDetails,
   getNodeAtPath,
@@ -217,4 +218,17 @@ test('writeConfig writes empty <path> custom IDs as explicit tables', () => {
   } finally {
     fs.rmSync(tempDirectory, { recursive: true, force: true });
   }
+});
+
+test('buildRows does not mark tools.web_search deprecated unless upstream does', () => {
+  const rows = buildRows(
+    {
+      web_search: true,
+    },
+    ['tools']
+  );
+  const webSearchRow = rows.find((row) => row.key === 'web_search');
+
+  assert.equal(Boolean(webSearchRow), true);
+  assert.equal(webSearchRow.isDeprecated, false);
 });

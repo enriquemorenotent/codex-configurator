@@ -22,12 +22,6 @@ const CONFIG_VALUE_OPTIONS = {
 
 const CONFIG_PATH_EXPLANATIONS = [
   {
-    path: ['tools', 'web_search'],
-    short: 'Deprecated legacy web search flag.',
-    usage: 'Use the top-level web_search setting instead.',
-    deprecation: 'tools.web_search is deprecated; use the top-level web_search setting instead.',
-  },
-  {
     path: ['projects', '*', 'trust_level'],
     short: 'Controls how much trust this project gets for command execution.',
     usage: 'Use trusted for known folders, untrusted for extra prompts.',
@@ -61,7 +55,7 @@ const CONFIG_OPTION_EXPLANATIONS = {
 };
 const SECTION_PURPOSE_OVERRIDES = {
   agents: 'Named agent definitions and per-agent configuration file references.',
-  apps: 'Per-app enablement rules and disable reasons.',
+  apps: 'Per-app enablement rules and tool-level approval controls.',
   features: 'Feature flags for optional and experimental Codex behavior.',
   feedback: 'Feedback submission settings for Codex surfaces.',
   history: 'Session history retention policy and on-disk size limits.',

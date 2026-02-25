@@ -409,8 +409,7 @@ const formatRowLabel = (key, kind, value) =>
       : `${key} = ${previewValue(value)}`;
 
 const isPathDeprecated = (pathSegments, key) =>
-  Boolean(getReferenceOptionForPath([...pathSegments, String(key)])?.deprecated) ||
-  isToolsWebSearchDeprecated(pathSegments, key);
+  Boolean(getReferenceOptionForPath([...pathSegments, String(key)])?.deprecated);
 
 const sortRowsAlphabetically = (rows) =>
   [...rows].sort((left, right) => String(left.key).localeCompare(String(right.key)));
@@ -522,9 +521,6 @@ const buildRootRows = (node) => buildDefinedRows(node, getReferenceRootDefinitio
 
 const getTableDefinitions = (pathSegments) =>
   Array.isArray(pathSegments) ? getReferenceTableDefinitions(pathSegments) : [];
-
-const isToolsWebSearchDeprecated = (pathSegments, key) =>
-  pathSegments[pathSegments.length - 1] === 'tools' && key === 'web_search';
 
 export const getNodeAtPath = (root, segments) => {
   let current = root;

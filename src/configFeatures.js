@@ -65,22 +65,10 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     { defaultValue: true, isDocumented: true }
   ),
   makeFeatureDefinition('connectors', 'Enable external connector support.', 'Controls optional third-party connector behavior.'),
-  makeFeatureDefinition(
-    'elevated_windows_sandbox',
-    'Enable elevated Windows sandbox.',
-    'Allows higher-permission sandbox behavior on Windows.',
-    { isDocumented: true }
-  ),
   makeFeatureDefinition('enable_experimental_windows_sandbox', 'Enable experimental Windows sandbox.', 'Turns on experimental Windows sandbox behavior.'),
   makeFeatureDefinition('enable_request_compression', 'Enable request compression.', 'Compress request payloads for matching model endpoints.'),
   makeFeatureDefinition('experimental_use_freeform_apply_patch', 'Enable experimental freeform apply_patch usage.', 'Allows experimental patching behavior in edit flows.'),
   makeFeatureDefinition('experimental_use_unified_exec_tool', 'Enable experimental unified exec tool.', 'Use unified execution routing when invoking shell tools.'),
-  makeFeatureDefinition(
-    'experimental_windows_sandbox',
-    'Enable experimental Windows sandbox.',
-    'Turns on a newer Windows sandbox implementation.',
-    { isDocumented: true }
-  ),
   makeFeatureDefinition('include_apply_patch_tool', 'Expose the apply_patch tool.', 'Makes apply patch tool calls available to the model.'),
   makeFeatureDefinition('js_repl', 'Enable JavaScript REPL.', 'Allow JavaScript-based REPL style tooling.'),
   makeFeatureDefinition('js_repl_tools_only', 'Restrict js_repl to tool-only mode.', 'Limits js_repl usage to explicit tool calls.'),
@@ -164,30 +152,19 @@ export const CONFIG_FEATURE_DEFINITIONS = [
     'web_search',
     'Enable web search tool.',
     'Allows the model to call a web search tool.',
-    {
-      deprecation: '[features].web_search is deprecated; use the top-level web_search setting instead.',
-      isDocumented: true,
-    }
+    { isDocumented: true }
   ),
   makeFeatureDefinition(
     'web_search_cached',
     'Enable cached web search only.',
     'Restricts web search calls to cached results.',
-    {
-      deprecation:
-        '[features].web_search_cached is deprecated legacy toggle. `true` maps to `web_search = "cached"`.',
-      isDocumented: true,
-    }
+    { isDocumented: true }
   ),
   makeFeatureDefinition(
     'web_search_request',
     'Enable web search request flow.',
     'Turns on request-mode web search behavior.',
-    {
-      deprecation:
-        '[features].web_search_request is deprecated legacy toggle. `true` maps to `web_search = "live"`.',
-      isDocumented: true,
-    }
+    { isDocumented: true }
   ),
 ];
 
