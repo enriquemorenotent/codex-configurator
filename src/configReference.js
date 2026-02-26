@@ -365,6 +365,218 @@ const mergeOptionType = (current, next) => {
   return `${current} | ${next}`;
 };
 
+const getSingleDiscriminatorValue = (schema) => {
+  if (!schema || typeof schema !== 'object') {
+    return null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(schema, 'const')) {
+    return schema.const;
+  }
+
+  if (Array.isArray(schema.enum) && schema.enum.length === 1) {
+    return schema.enum[0];
+  }
+
+  return null;
+};
+
+const getObjectBranchLabel = (branch, index) => {
+  const title = String(branch?.title || '').trim();
+  if (title) {
+    return title;
+  }
+
+  const properties = branch?.properties && typeof branch.properties === 'object'
+    ? branch.properties
+    : {};
+  const propertyEntries = Object.entries(properties);
+
+  for (const [propertyKey, propertySchema] of propertyEntries) {
+    const discriminatorValue = getSingleDiscriminatorValue(propertySchema);
+    if (discriminatorValue !== null && typeof discriminatorValue !== 'undefined') {
+      return String(discriminatorValue);
+    }
+
+    const propertyTitle = String(propertySchema?.title || '').trim();
+    if (propertyTitle) {
+      return propertyTitle;
+    }
+
+    if (Array.isArray(propertySchema?.enum) && propertySchema.enum.length > 0) {
+      return `${propertyKey}=${String(propertySchema.enum[0])}`;
+    }
+  }
+
+  const requiredKeys = Array.isArray(branch?.required)
+    ? branch.required.map((key) => String(key))
+    : [];
+  if (requiredKeys.length === 1) {
+    return requiredKeys[0];
+  }
+
+  const signatureKeys = propertyEntries
+    .map(([propertyKey]) => String(propertyKey))
+    .sort((left, right) => left.localeCompare(right));
+  if (signatureKeys.length > 0) {
+    return signatureKeys.join('+');
+  }
+
+  if (requiredKeys.length > 0) {
+    return requiredKeys
+      .slice()
+      .sort((left, right) => left.localeCompare(right))
+      .join('+');
+  }
+
+  return `object_${index + 1}`;
+};
+
+const getObjectBranchFixedValues = (branch) => {
+  const properties = branch?.properties && typeof branch.properties === 'object'
+    ? branch.properties
+    : {};
+  const fixedValues = {};
+
+  Object.entries(properties).forEach(([key, propertySchema]) => {
+    const fixedValue = getSingleDiscriminatorValue(propertySchema);
+    if (fixedValue !== null && typeof fixedValue !== 'undefined') {
+      fixedValues[String(key)] = fixedValue;
+    }
+  });
+
+  return fixedValues;
+};
+
+const buildMixedVariantInfo = (scalarType, objectBranches) => {
+  const seenLabels = new Map();
+  const objectVariants = objectBranches.map((branch, index) => {
+    const baseLabel = getObjectBranchLabel(branch, index);
+    const occurrence = (seenLabels.get(baseLabel) || 0) + 1;
+    seenLabels.set(baseLabel, occurrence);
+    const label = occurrence === 1 ? baseLabel : `${baseLabel} (${occurrence})`;
+    const requiredKeys = Array.isArray(branch?.required)
+      ? branch.required.map((key) => String(key))
+      : [];
+    const fixedValues = getObjectBranchFixedValues(branch);
+
+    return {
+      id: `object_${index + 1}`,
+      label,
+      requiredKeys,
+      fixedValues,
+    };
+  });
+
+  const requiredObjectKeys = [
+    ...new Set(
+      objectVariants
+        .flatMap((variant) => variant.requiredKeys)
+        .map((key) => String(key))
+    ),
+  ];
+
+  return {
+    kind: 'scalar_object',
+    scalarType,
+    requiredObjectKeys,
+    objectVariants,
+  };
+};
+
+const mergeVariantInfo = (current, next) => {
+  if (!next || typeof next !== 'object') {
+    return current || null;
+  }
+
+  if (!current || typeof current !== 'object') {
+    return {
+      ...next,
+      requiredObjectKeys: Array.isArray(next.requiredObjectKeys)
+        ? [...next.requiredObjectKeys]
+        : [],
+      objectVariants: Array.isArray(next.objectVariants)
+        ? next.objectVariants.map((variant) => ({
+            ...variant,
+            requiredKeys: Array.isArray(variant.requiredKeys)
+              ? [...variant.requiredKeys]
+              : [],
+            fixedValues:
+              variant.fixedValues && typeof variant.fixedValues === 'object'
+                ? { ...variant.fixedValues }
+                : {},
+          }))
+        : [],
+    };
+  }
+
+  if (current.kind !== 'scalar_object' || next.kind !== 'scalar_object') {
+    return current;
+  }
+
+  const mergedById = new Map();
+
+  [...(current.objectVariants || []), ...(next.objectVariants || [])].forEach((variant) => {
+    const variantId = String(variant?.id || '');
+    if (!variantId) {
+      return;
+    }
+
+    const previous = mergedById.get(variantId);
+    if (!previous) {
+      mergedById.set(variantId, {
+        id: variantId,
+        label: String(variant.label || variantId),
+        requiredKeys: Array.isArray(variant.requiredKeys)
+          ? variant.requiredKeys.map((key) => String(key))
+          : [],
+        fixedValues:
+          variant.fixedValues && typeof variant.fixedValues === 'object'
+            ? { ...variant.fixedValues }
+            : {},
+      });
+      return;
+    }
+
+    mergedById.set(variantId, {
+      ...previous,
+      requiredKeys: [
+        ...new Set([
+          ...previous.requiredKeys,
+          ...(Array.isArray(variant.requiredKeys)
+            ? variant.requiredKeys.map((key) => String(key))
+            : []),
+        ]),
+      ],
+      fixedValues: {
+        ...previous.fixedValues,
+        ...(variant.fixedValues && typeof variant.fixedValues === 'object'
+          ? variant.fixedValues
+          : {}),
+      },
+    });
+  });
+
+  return {
+    kind: 'scalar_object',
+    scalarType: mergeOptionType(
+      String(current.scalarType || ''),
+      String(next.scalarType || '')
+    ),
+    requiredObjectKeys: [
+      ...new Set([
+        ...(Array.isArray(current.requiredObjectKeys)
+          ? current.requiredObjectKeys.map((key) => String(key))
+          : []),
+        ...(Array.isArray(next.requiredObjectKeys)
+          ? next.requiredObjectKeys.map((key) => String(key))
+          : []),
+      ]),
+    ],
+    objectVariants: [...mergedById.values()],
+  };
+};
+
 const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, overrides = {}) => {
   const normalizedPath = normalizeSegments(pathSegments);
   const key = normalizedPath.join('.');
@@ -381,6 +593,7 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
   const enumOptionDescriptions = {
     ...(overrides.enumOptionDescriptions || {}),
   };
+  const variantInfo = overrides.variantInfo || null;
 
   if (!existing) {
     optionsByKey.set(key, {
@@ -392,6 +605,7 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
       enumOptionDescriptions,
       description,
       deprecated: schema?.deprecated === true,
+      variantInfo,
     });
     return;
   }
@@ -403,6 +617,7 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
     existing.enumOptionDescriptions,
     enumOptionDescriptions
   );
+  existing.variantInfo = mergeVariantInfo(existing.variantInfo, variantInfo);
   if (!existing.description && description) {
     existing.description = description;
   }
@@ -446,9 +661,19 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
           {
             type: scalarTypeLabel,
             enumOptionDescriptions: enumDescriptionsByValue,
+            variantInfo: buildMixedVariantInfo(scalarTypeLabel, objectBranches),
           }
         );
       }
+
+      objectBranches.forEach((branch) => {
+        const branchNormalized = normalizeDefinition(branch, context.definitions);
+        if (branchNormalized?.properties) {
+          Object.entries(branchNormalized.properties).forEach(([segment, value]) => {
+            collectSchemaOptions(value, [...normalizedPath, segment], optionsByKey, context);
+          });
+        }
+      });
 
       return;
     }
@@ -596,7 +821,7 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
         context.definitions
       );
 
-      if (normalizedAdditional?.properties || normalizedAdditional?.type === 'object') {
+      if (normalizedAdditional?.properties) {
         Object.keys(normalizedAdditional.properties || {}).forEach((segment) => {
           collectSchemaOptions(
             normalizedAdditional.properties[segment],
@@ -774,6 +999,55 @@ export const getReferenceOptionForPath = (pathSegments) => {
   });
 
   return candidates[0];
+};
+
+const getVariantObjectPaths = (normalizedPath) => {
+  const depth = normalizedPath.length;
+  const paths = referenceOptions
+    .filter((option) => pathPrefixMatches(option.keyPath, normalizedPath))
+    .filter((option) => option.keyPath.length > depth)
+    .map((option) => option.keyPath.slice(depth).join('.'))
+    .filter((relativePath) => relativePath.length > 0);
+
+  return [...new Set(paths)].sort((left, right) => left.localeCompare(right));
+};
+
+export const getReferenceVariantForPath = (pathSegments = []) => {
+  const normalizedPath = normalizeSegments(pathSegments);
+  if (normalizedPath.length === 0) {
+    return null;
+  }
+
+  const entry = getReferenceOptionForPath(normalizedPath);
+  const variantInfo = entry?.variantInfo;
+  if (!variantInfo || variantInfo.kind !== 'scalar_object') {
+    return null;
+  }
+
+  return {
+    kind: 'scalar_object',
+    scalarType: String(variantInfo.scalarType || entry.type || 'value'),
+    scalarOptions: Array.isArray(entry.enumValues)
+      ? entry.enumValues.map((value) => String(value))
+      : [],
+    requiredObjectKeys: Array.isArray(variantInfo.requiredObjectKeys)
+      ? variantInfo.requiredObjectKeys.map((key) => String(key))
+      : [],
+    objectVariants: Array.isArray(variantInfo.objectVariants)
+      ? variantInfo.objectVariants.map((variant) => ({
+          id: String(variant.id),
+          label: String(variant.label),
+          requiredKeys: Array.isArray(variant.requiredKeys)
+            ? variant.requiredKeys.map((key) => String(key))
+            : [],
+          fixedValues:
+            variant.fixedValues && typeof variant.fixedValues === 'object'
+              ? { ...variant.fixedValues }
+              : {},
+        }))
+      : [],
+    objectSchemaPaths: getVariantObjectPaths(normalizedPath),
+  };
 };
 
 export const getReferenceTableDefinitions = (pathSegments = []) => {

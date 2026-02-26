@@ -37,7 +37,7 @@ npm start
 - `↑` `↓` : move selection
 - `PgUp` `PgDn`: move one page up/down
 - `Home` `End`: jump to first/last item
-- `Enter`: open selected table; for boolean settings, toggle directly; for string settings, open inline input; for other preset values, open picker
+- `Enter`: open selected table; for mixed scalar/object settings, choose a preset first (object presets open nested settings); for boolean settings, toggle directly; for string settings, open inline input; for other preset values, open picker
 - `/`: start fuzzy filter mode for the current list
 - `Del`: unset selected value or remove selected custom `<id>` entry from `config.toml`
 - `←` / `Backspace`: move up one level (to parent table)

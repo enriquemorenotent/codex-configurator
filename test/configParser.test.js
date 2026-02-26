@@ -8,6 +8,7 @@ import {
   MAX_DETAIL_CHARS,
   buildRows,
   deleteValueAtPath,
+  deleteValueAtPathPruningEmptyObjects,
   formatDetails,
   getNodeAtPath,
   resolveConfigPath,
@@ -141,6 +142,52 @@ test('deleteValueAtPath removes array items when the path segment is numeric tex
   assert.deepEqual(source.models, ['gpt-4.1', 'gpt-5', 'o3']);
 });
 
+test('deleteValueAtPathPruningEmptyObjects prunes empty object ancestors', () => {
+  const source = {
+    approval_policy: {
+      reject: {
+        mcp_elicitations: true,
+      },
+    },
+  };
+
+  const updated = deleteValueAtPathPruningEmptyObjects(
+    source,
+    ['approval_policy', 'reject', 'mcp_elicitations']
+  );
+
+  assert.deepEqual(updated, {});
+  assert.deepEqual(source, {
+    approval_policy: {
+      reject: {
+        mcp_elicitations: true,
+      },
+    },
+  });
+});
+
+test('deleteValueAtPathPruningEmptyObjects keeps non-empty ancestors', () => {
+  const source = {
+    approval_policy: {
+      reject: {
+        mcp_elicitations: true,
+      },
+      untouched: true,
+    },
+  };
+
+  const updated = deleteValueAtPathPruningEmptyObjects(
+    source,
+    ['approval_policy', 'reject', 'mcp_elicitations']
+  );
+
+  assert.deepEqual(updated, {
+    approval_policy: {
+      untouched: true,
+    },
+  });
+});
+
 test('formatDetails truncates large structured values and keeps scalar values intact', () => {
   const oversized = { long: 'x'.repeat(MAX_DETAIL_CHARS * 2) };
   const details = formatDetails(oversized);
@@ -231,4 +278,45 @@ test('buildRows does not mark tools.web_search deprecated unless upstream does',
 
   assert.equal(Boolean(webSearchRow), true);
   assert.equal(webSearchRow.isDeprecated, false);
+});
+
+test('buildRows shows unset mixed/scalar values as not set', () => {
+  const rows = buildRows({}, []);
+  const approvalPolicyRow = rows.find((row) => row.key === 'approval_policy');
+
+  assert.equal(Boolean(approvalPolicyRow), true);
+  assert.equal(approvalPolicyRow.isConfigured, false);
+  assert.equal(approvalPolicyRow.value, undefined);
+  assert.equal(approvalPolicyRow.preview, 'not set');
+  assert.equal(approvalPolicyRow.label, 'approval_policy = not set');
+});
+
+test('buildRows keeps configured mixed object values as value rows', () => {
+  const rows = buildRows(
+    {
+      approval_policy: {
+        reject: {
+          rules: true,
+        },
+      },
+    },
+    []
+  );
+  const approvalPolicyRow = rows.find((row) => row.key === 'approval_policy');
+
+  assert.equal(Boolean(approvalPolicyRow), true);
+  assert.equal(approvalPolicyRow.isConfigured, true);
+  assert.equal(approvalPolicyRow.kind, 'value');
+  assert.equal(approvalPolicyRow.label, 'approval_policy /');
+});
+
+test('buildRows shows unset feature flags as not set', () => {
+  const rows = buildRows({}, ['features']);
+  const webSearchRow = rows.find((row) => row.key === 'web_search');
+
+  assert.equal(Boolean(webSearchRow), true);
+  assert.equal(webSearchRow.isConfigured, false);
+  assert.equal(webSearchRow.value, undefined);
+  assert.equal(webSearchRow.preview, 'not set');
+  assert.equal(webSearchRow.label, 'web_search = not set');
 });

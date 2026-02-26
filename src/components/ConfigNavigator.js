@@ -5,10 +5,16 @@ import {
   getConfigOptions,
   getConfigOptionExplanation,
   getConfigDefaultOption,
+  getConfigVariantMeta,
 } from '../configHelp.js';
 import { computePaneWidths, clamp } from '../layout.js';
 import { getNodeAtPath, buildRows } from '../configParser.js';
 import { filterRowsByQuery } from '../fuzzySearch.js';
+import {
+  buildVariantSelectorOptions,
+  isObjectValue,
+  objectMatchesVariant,
+} from '../variantPresets.js';
 
 const MenuItem = ({ isSelected, isDimmed, isDeprecated, label }) =>
   React.createElement(
@@ -142,7 +148,6 @@ const renderEditableOptions = (
   options,
   selectedOptionIndex,
   defaultOptionIndex,
-  optionPathSegments,
   rowKey,
   savedOptionIndex = null,
   showCursor = false
@@ -299,12 +304,34 @@ export const ConfigNavigator = ({
     selectedRow && selectedRow.pathSegment != null
       ? [...pathSegments, selectedRow.pathSegment]
       : pathSegments;
-  const readOnlyOptions =
-    selectedRow && selectedRow.kind === 'value'
-      ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
+  const selectedVariantMeta =
+    selectedRow &&
+    selectedRow.pathSegment != null &&
+    typeof selectedRow.key === 'string'
+      ? getConfigVariantMeta(pathSegments, selectedRow.key)
+      : null;
+  const mixedVariantReadOnlyOptions =
+    selectedRow &&
+    selectedVariantMeta?.kind === 'scalar_object'
+      ? buildVariantSelectorOptions(selectedVariantMeta)
       : [];
-  const readOnlyOptionIndex = readOnlyOptions.findIndex((option) => Object.is(option, selectedRow?.value));
-  const readOnlyDefaultOption = selectedRow
+  const readOnlyOptions =
+    mixedVariantReadOnlyOptions.length > 0
+      ? mixedVariantReadOnlyOptions.map((option) => option.label)
+      : selectedRow && selectedRow.kind === 'value'
+        ? getConfigOptions(selectedPath, selectedRow.key, selectedRow.value, selectedRow.kind) || []
+        : [];
+  const readOnlyOptionIndex =
+    mixedVariantReadOnlyOptions.length > 0
+      ? isObjectValue(selectedRow?.value)
+        ? mixedVariantReadOnlyOptions.findIndex(
+            (option) => option.kind === 'object' && objectMatchesVariant(selectedRow.value, option)
+          )
+        : mixedVariantReadOnlyOptions.findIndex(
+            (option) => option.kind === 'scalar' && Object.is(option.value, String(selectedRow?.value))
+          )
+      : readOnlyOptions.findIndex((option) => Object.is(option, selectedRow?.value));
+  const readOnlyDefaultOption = selectedRow?.isConfigured
     ? getConfigDefaultOption(selectedPath, selectedRow.key, selectedRow.kind, readOnlyOptions)
     : null;
   const readOnlyDefaultOptionIndex = readOnlyOptions.findIndex((option) =>
@@ -315,7 +342,7 @@ export const ConfigNavigator = ({
     !isBooleanOnlyOptions(readOnlyOptions);
 
   const editRow = rows[selected] || null;
-  const editDefaultOption = editMode && editMode.mode === 'select' && editRow
+  const editDefaultOption = editMode && editMode.mode === 'select' && editRow?.isConfigured
     ? getConfigDefaultOption(editMode.path, editRow.key, 'value', editMode.options)
     : null;
   const editDefaultOptionIndex = editMode && editMode.mode === 'select'
@@ -353,7 +380,6 @@ export const ConfigNavigator = ({
             editMode.options,
             editMode.selectedOptionIndex,
             editDefaultOptionIndex,
-            editMode.path.slice(0, -1),
             rows[selected].key,
             editMode.savedOptionIndex,
             true
@@ -367,7 +393,6 @@ export const ConfigNavigator = ({
             readOnlyOptions,
             readOnlyOptionIndex,
             readOnlyDefaultOptionIndex,
-            selectedPath,
             selectedRow?.key,
             null,
             false

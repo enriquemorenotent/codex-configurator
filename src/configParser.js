@@ -4,11 +4,6 @@ import path from 'path';
 import * as toml from 'toml';
 import { stringify } from '@iarna/toml';
 import {
-  getConfigDefaultOption,
-  getConfigOptions,
-} from './configHelp.js';
-import {
-  getConfigFeatureDefinition,
   getConfigFeatureKeys,
 } from './configFeatures.js';
 import {
@@ -16,6 +11,7 @@ import {
   getReferenceCustomIdPlaceholder,
   getReferenceRootDefinitions,
   getReferenceTableDefinitions,
+  getReferenceVariantForPath,
 } from './configReference.js';
 import { logConfiguratorError } from './errorLogger.js';
 
@@ -306,12 +302,8 @@ const buildFeatureRows = (node) => {
 
   featureKeys.forEach((key) => {
     const isConfigured = configuredSet.has(key);
-    const definition = getConfigFeatureDefinition(key);
-    const defaultValue = typeof definition?.defaultValue === 'boolean'
-      ? definition.defaultValue
-      : false;
-    const value = isConfigured ? node[key] : defaultValue;
-    const preview = isConfigured ? previewValue(value) : `${String(defaultValue)} [default]`;
+    const value = isConfigured ? node[key] : undefined;
+    const preview = isConfigured ? previewValue(value) : 'not set';
     const isDeprecated = false;
 
     seenKeys.add(key);
@@ -320,7 +312,7 @@ const buildFeatureRows = (node) => {
       kind: 'value',
       value,
       pathSegment: key,
-      label: `${key} = ${preview}`,
+      label: isConfigured ? `${key} = ${preview}` : `${key} = not set`,
       preview,
       isConfigured,
           isDeprecated,
@@ -336,7 +328,6 @@ const buildFeatureRows = (node) => {
       .map((key) => {
         const value = node[key];
         const preview = previewValue(value);
-        const definition = getConfigFeatureDefinition(key);
 
         return {
           key,
@@ -387,7 +378,7 @@ const getBooleanReferenceDefault = (pathSegments, key) => {
   return inferBooleanDefaultFromDescription(referenceOption?.description);
 };
 
-const formatMissingDefinitionLabel = (definition, pathSegments, defaultOptionValue) => {
+const formatMissingDefinitionLabel = (definition, pathSegments) => {
   if (definition.kind === 'table') {
     return `${definition.key} /`;
   }
@@ -395,10 +386,6 @@ const formatMissingDefinitionLabel = (definition, pathSegments, defaultOptionVal
   const booleanDefault = getBooleanReferenceDefault(pathSegments, definition.key);
   if (booleanDefault !== null) {
     return `${definition.key} = ${String(booleanDefault)} [default]`;
-  }
-
-  if (typeof defaultOptionValue !== 'undefined') {
-    return `${definition.key} = ${previewValue(defaultOptionValue)} [default]`;
   }
 
   const referenceOption = getReferenceOptionForPath([...pathSegments, String(definition.key)]);
@@ -461,22 +448,26 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
 
   definitions.forEach((definition) => {
     const isConfigured = configuredSet.has(definition.key);
+    const variantMeta = getReferenceVariantForPath([...pathSegments, String(definition.key)]);
+    const isMixedVariant = variantMeta?.kind === 'scalar_object';
     seenKeys.add(definition.key);
 
     if (!isConfigured) {
+      if (definition.kind === 'value' || isMixedVariant) {
+        rows.push({
+          key: definition.key,
+          kind: 'value',
+          value: undefined,
+          pathSegment: definition.key,
+          label: `${definition.key} = not set`,
+          preview: 'not set',
+          isConfigured: false,
+          isDeprecated: false,
+        });
+        return;
+      }
+
       const booleanDefault = getBooleanReferenceDefault(pathSegments, definition.key);
-      const options = getConfigOptions(
-        [...pathSegments, definition.key],
-        definition.key,
-        undefined,
-        definition.kind
-      );
-      const configDefault = getConfigDefaultOption(
-        pathSegments,
-        definition.key,
-        definition.kind,
-        options
-      );
       const value =
         definition.kind === 'table'
           ? {}
@@ -484,20 +475,17 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
             ? []
             : booleanDefault !== null
               ? booleanDefault
-              : configDefault;
-      const isDefaultValue = typeof configDefault !== 'undefined' && booleanDefault === null;
+              : undefined;
 
       rows.push({
         key: definition.key,
         kind: definition.kind,
         value,
         pathSegment: definition.key,
-        label: formatMissingDefinitionLabel(definition, pathSegments, isDefaultValue ? value : undefined),
+        label: formatMissingDefinitionLabel(definition, pathSegments),
         preview: booleanDefault !== null
           ? `${String(booleanDefault)} [default]`
-          : isDefaultValue
-            ? `${previewValue(value)} [default]`
-            : 'default',
+          : 'default',
         isConfigured: false,
         isDeprecated: false,
       });
@@ -505,13 +493,17 @@ const buildDefinedRows = (node, definitions, pathSegments) => {
     }
 
     const value = node[definition.key];
-    const kind = definition.kind === 'value' ? 'value' : getNodeKind(value);
+    const valueKind = getNodeKind(value);
+    const kind = definition.kind === 'value' || isMixedVariant ? 'value' : valueKind;
+    const label = isMixedVariant && valueKind === 'table'
+      ? `${definition.key} /`
+      : formatRowLabel(definition.key, kind, value);
     rows.push({
       key: definition.key,
       kind,
       value,
       pathSegment: definition.key,
-      label: formatRowLabel(definition.key, kind, value),
+      label,
       preview: previewValue(value),
       isConfigured: true,
       isDeprecated: false,
@@ -719,6 +711,39 @@ export const deleteValueAtPath = (root, segments) => {
   }
 
   return copy;
+};
+
+const isEmptyPlainObject = (value) =>
+  isPlainObject(value) && Object.keys(value).length === 0;
+
+export const deleteValueAtPathPruningEmptyObjects = (root, segments) => {
+  if (!root || segments.length === 0) {
+    return root;
+  }
+
+  let nextData = deleteValueAtPath(root, segments);
+  const parentPath = segments.slice(0, -1);
+
+  for (let depth = parentPath.length - 1; depth >= 0; depth -= 1) {
+    const candidatePath = parentPath.slice(0, depth + 1);
+    const candidateValue = getNodeAtPath(nextData, candidatePath);
+    if (!isEmptyPlainObject(candidateValue)) {
+      break;
+    }
+
+    const containerPath = candidatePath.slice(0, -1);
+    const containerValue =
+      containerPath.length === 0
+        ? nextData
+        : getNodeAtPath(nextData, containerPath);
+    if (!isPlainObject(containerValue)) {
+      continue;
+    }
+
+    nextData = deleteValueAtPath(nextData, candidatePath);
+  }
+
+  return nextData;
 };
 
 export const getTableKind = (node) => getNodeKind(node);

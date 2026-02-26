@@ -9,16 +9,27 @@ import {
   readConfig,
   getNodeAtPath,
   buildRows,
-  deleteValueAtPath,
+  deleteValueAtPathPruningEmptyObjects,
   setValueAtPath,
   writeConfig,
 } from './src/configParser.js';
-import { getConfigOptions } from './src/configHelp.js';
+import {
+  getConfigOptions,
+  getConfigVariantMeta,
+} from './src/configHelp.js';
 import {
   getReferenceOptionForPath,
   getReferenceCustomIdPlaceholder,
 } from './src/configReference.js';
 import { normalizeCustomPathId } from './src/customPathId.js';
+import {
+  applyVariantSelection,
+  buildVariantSelectorOptions,
+  isObjectValue,
+  objectMatchesVariant,
+  resolveMixedVariantBackNavigationPath,
+  resolveObjectVariantNavigationPath,
+} from './src/variantPresets.js';
 import { pathToKey, clamp } from './src/layout.js';
 import {
   isBackspaceKey,
@@ -352,6 +363,60 @@ const App = () => {
     });
   };
 
+  const beginVariantEditing = (target, targetPath, variantMeta) => {
+    if (variantMeta?.kind !== 'scalar_object') {
+      return;
+    }
+
+    const variantOptions = buildVariantSelectorOptions(variantMeta);
+    if (variantOptions.length === 0) {
+      return;
+    }
+
+    const currentVariantIndex = isObjectValue(target.value)
+      ? variantOptions.findIndex(
+          (option) => option.kind === 'object' && objectMatchesVariant(target.value, option)
+        )
+      : variantOptions.findIndex(
+          (option) => option.kind === 'scalar' && Object.is(option.value, String(target.value))
+        );
+    const selectedOptionIndex = currentVariantIndex >= 0 ? currentVariantIndex : 0;
+
+    setEditError('');
+    setEditMode({
+      mode: 'variant-select',
+      key: target.key,
+      path: targetPath,
+      options: variantOptions.map((option) => option.label),
+      variantOptions,
+      selectedOptionIndex: clamp(selectedOptionIndex, 0, variantOptions.length - 1),
+      savedOptionIndex: null,
+    });
+  };
+
+  const openPathView = (nextPath, nextData) => {
+    const data = typeof nextData === 'undefined'
+      ? (snapshot.ok ? snapshot.data : {})
+      : nextData;
+    const nextNode = getNodeAtPath(data, nextPath);
+    const nextRows = buildRows(nextNode, nextPath);
+    const nextViewportHeight = computeListViewportHeight(nextRows, terminalHeight);
+    const nextSavedIndex = getSavedIndex(nextPath, 0);
+    const nextSelected = nextRows.length === 0
+      ? 0
+      : clamp(nextSavedIndex, 0, nextRows.length - 1);
+
+    setSelectionByPath((previous) => ({
+      ...previous,
+      [currentPathKey]: safeSelected,
+    }));
+    setPathSegments(nextPath);
+    setSelectedIndex(nextSelected);
+    setScrollOffset(
+      clamp(nextSelected, 0, Math.max(0, nextRows.length - nextViewportHeight))
+    );
+  };
+
   const applyEdit = () => {
     if (!editMode || editMode.mode !== 'select') {
       return;
@@ -431,24 +496,82 @@ const App = () => {
       return;
     }
 
-    const nextData = setValueAtPath(data, nextPath, {});
-    const writeResult = writeConfig(nextData, snapshot.path);
+    openPathView(nextPath, data);
+    setEditMode(null);
+    setEditError('');
+  };
 
-    if (!writeResult.ok) {
-      setEditError(writeResult.error);
+  const applyVariantEdit = () => {
+    if (!editMode || editMode.mode !== 'variant-select') {
       return;
     }
 
-    setSnapshot({
-      ok: true,
-      path: snapshot.path,
-      data: nextData,
+    const selectedVariant = Array.isArray(editMode.variantOptions)
+      ? editMode.variantOptions[editMode.selectedOptionIndex]
+      : null;
+    if (!selectedVariant) {
+      setEditMode(null);
+      setEditError('');
+      return;
+    }
+
+    const data = snapshot.ok ? snapshot.data : {};
+    const currentValue = getNodeAtPath(data, editMode.path);
+    const selectionResult = applyVariantSelection({
+      currentValue,
+      selectedVariant,
+      resolveDefaultValue: (requiredKey) => {
+        const requiredPath = [...editMode.path, requiredKey];
+        const requiredOptions = getConfigOptions(requiredPath, requiredKey, undefined, 'value') || [];
+        if (requiredOptions.length > 0) {
+          return requiredOptions[0];
+        }
+
+        if (isStringReferenceType(getReferenceOptionForPath(requiredPath)?.type)) {
+          return '';
+        }
+
+        return {};
+      },
     });
-    setPathSegments(nextPath);
-    setSelectedIndex(0);
-    setScrollOffset(0);
-    setEditMode(null);
+
+    const shouldPersistSelection =
+      selectionResult.changed &&
+      (
+        !selectionResult.isObjectSelection ||
+        selectionResult.isObjectVariantSwitch
+      );
+    let nextData = data;
+    if (shouldPersistSelection) {
+      nextData = setValueAtPath(data, editMode.path, selectionResult.nextValue);
+      const writeResult = writeConfig(nextData, snapshot.path);
+
+      if (!writeResult.ok) {
+        setEditError(writeResult.error);
+        return;
+      }
+
+      setSnapshot({
+        ok: true,
+        path: snapshot.path,
+        data: nextData,
+      });
+    }
+
+    if (selectionResult.navigateToObject) {
+      const nextPath = resolveObjectVariantNavigationPath({
+        basePath: editMode.path,
+        nextValue: selectionResult.nextValue,
+        preferredKey:
+          selectedVariant.kind === 'object' && selectedVariant.requiredKeys.length === 1
+            ? selectedVariant.requiredKeys[0]
+            : null,
+      });
+      openPathView(nextPath, nextData);
+    }
+
     setEditError('');
+    setEditMode(null);
   };
 
   const applyBooleanToggle = (target, targetPath) => {
@@ -480,7 +603,7 @@ const App = () => {
       return;
     }
 
-    const nextData = deleteValueAtPath(data, targetPath);
+    const nextData = deleteValueAtPathPruningEmptyObjects(data, targetPath);
     const writeResult = writeConfig(nextData, snapshot.path);
 
     if (!writeResult.ok) {
@@ -654,6 +777,11 @@ const App = () => {
       }
 
       if (key.return) {
+        if (editMode.mode === 'variant-select') {
+          applyVariantEdit();
+          return;
+        }
+
         applyEdit();
         return;
       }
@@ -756,27 +884,23 @@ const App = () => {
         return;
       }
 
-      if (target.kind === 'table' || target.kind === 'tableArray') {
-        const nextPath = [...pathSegments, target.pathSegment];
-
-        setPathSegments((previous) => [...previous, target.pathSegment]);
-        setSelectionByPath((previous) => ({
-          ...previous,
-          [currentPathKey]: safeSelected,
-        }));
-
-        const nextNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, nextPath);
-        const nextRows = buildRows(nextNode, nextPath);
-        const nextViewportHeight = computeListViewportHeight(nextRows, terminalHeight);
-        const nextSavedIndex = getSavedIndex(nextPath, 0);
-        const nextSelected = nextRows.length === 0 ? 0 : clamp(nextSavedIndex, 0, nextRows.length - 1);
-
-        setSelectedIndex(nextSelected);
-        setScrollOffset(clamp(nextSelected, 0, Math.max(0, nextRows.length - nextViewportHeight)));
+      const targetPath = [...pathSegments, target.pathSegment];
+      const variantMeta =
+        typeof target.pathSegment !== 'undefined' &&
+        target.pathSegment !== null &&
+        typeof target.key === 'string'
+          ? getConfigVariantMeta(pathSegments, target.key)
+          : null;
+      if (variantMeta?.kind === 'scalar_object') {
+        beginVariantEditing(target, targetPath, variantMeta);
         return;
       }
 
-      const targetPath = [...pathSegments, target.pathSegment];
+      if (target.kind === 'table' || target.kind === 'tableArray') {
+        openPathView(targetPath);
+        return;
+      }
+
       const options = getConfigOptions(targetPath, target.key, target.value, target.kind) || [];
       if (typeof target.value === 'boolean' || isBooleanOnlyOptions(options)) {
         applyBooleanToggle(
@@ -830,12 +954,16 @@ const App = () => {
         return;
       }
 
-      const parentPath = pathSegments.slice(0, -1);
-      const parentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, parentPath);
-      const parentRows = buildRows(parentNode, parentPath);
-      const savedIndex = getSavedIndex(parentPath, 0);
+      const fallbackParentPath = pathSegments.slice(0, -1);
+      const backTargetPath = resolveMixedVariantBackNavigationPath({
+        pathSegments,
+        resolveVariantMeta: getConfigVariantMeta,
+      }) || fallbackParentPath;
+      const parentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, backTargetPath);
+      const parentRows = buildRows(parentNode, backTargetPath);
+      const savedIndex = getSavedIndex(backTargetPath, 0);
 
-      setPathSegments(parentPath);
+      setPathSegments(backTargetPath);
       setSelectionByPath((previous) => ({
         ...previous,
         [currentPathKey]: safeSelected,

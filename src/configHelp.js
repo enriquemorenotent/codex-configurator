@@ -7,6 +7,7 @@ import {
   getReferenceCustomIdPlaceholder,
   getReferenceDescendantOptions,
   getReferenceTableDefinitions,
+  getReferenceVariantForPath,
 } from './configReference.js';
 
 const CONFIG_VALUE_OPTIONS = {
@@ -229,6 +230,9 @@ export const getConfigHelp = (segments, key) => {
 
   return null;
 };
+
+export const getConfigVariantMeta = (segments, key) =>
+  getReferenceVariantForPath(makePathSegments(segments, key));
 
 export const getConfigOptions = (segments, key, value, kind) => {
   if (kind !== 'value') {

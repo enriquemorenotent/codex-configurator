@@ -8,8 +8,8 @@ import {
 test('getConfigFeatureKeys follows upstream reference feature list', () => {
   const keys = getConfigFeatureKeys();
 
-  assert.equal(keys.includes('elevated_windows_sandbox'), false);
-  assert.equal(keys.includes('experimental_windows_sandbox'), false);
+  assert.equal(keys.includes('elevated_windows_sandbox'), true);
+  assert.equal(keys.includes('experimental_windows_sandbox'), true);
   assert.equal(keys.includes('web_search'), true);
   assert.equal(keys.includes('web_search_cached'), true);
   assert.equal(keys.includes('web_search_request'), true);
