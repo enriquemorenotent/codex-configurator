@@ -11,6 +11,7 @@ import {
   deleteValueAtPathPruningEmptyObjects,
   formatDetails,
   getNodeAtPath,
+  ensureConfigFileExists,
   resolveConfigPath,
   setValueAtPath,
   writeConfig,
@@ -60,23 +61,23 @@ test('resolveConfigPath applies environment override and expands tilde paths', (
   const resolvedPath = resolveConfigPath({
     argv: [],
     env: {
-      CODEX_CONFIGURATOR_CONFIG_PATH: '~/configs/custom.toml',
+      CODEX_CONFIGURATOR_CODEX_DIR: '~/configs/custom',
     },
     homeDir: '/tmp/codex-home',
   });
 
-  assert.equal(resolvedPath, '/tmp/codex-home/configs/custom.toml');
+  assert.equal(resolvedPath, '/tmp/codex-home/configs/custom/.codex/config.toml');
 });
 
-test('resolveConfigPath gives CLI --config precedence over environment overrides', () => {
+test('resolveConfigPath gives CLI --codex-dir precedence over environment overrides', () => {
   const resolvedPath = resolveConfigPath({
-    argv: ['--config', './tmp-config.toml'],
+    argv: ['--codex-dir', './tmp-config-dir'],
     env: {
-      CODEX_CONFIGURATOR_CONFIG_PATH: '/tmp/codex-home/configs/env.toml',
+      CODEX_CONFIGURATOR_CODEX_DIR: '/tmp/codex-home/configs/env',
     },
   });
 
-  assert.equal(resolvedPath, path.resolve('./tmp-config.toml'));
+  assert.equal(resolvedPath, path.resolve('./tmp-config-dir/.codex/config.toml'));
 });
 
 test('setValueAtPath updates deeply without mutating the source object', () => {
@@ -237,6 +238,40 @@ test('writeConfig creates missing parent directories and target file', () => {
     assert.equal(parsed.model, 'gpt-5');
     assert.equal(fs.existsSync(logPath), false);
   });
+});
+
+test('ensureConfigFileExists creates missing config file', () => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-configurator-'));
+  const configPath = path.join(tempDirectory, 'agents', 'reviewer.toml');
+
+  try {
+    const result = ensureConfigFileExists(configPath);
+    const loaded = toml.parse(fs.readFileSync(configPath, 'utf8'));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.path, configPath);
+    assert.deepEqual(result.data, loaded);
+    assert.deepEqual(Object.keys(loaded), []);
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test('ensureConfigFileExists keeps existing config file data', () => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-configurator-'));
+  const configPath = path.join(tempDirectory, 'agents', 'reviewer.toml');
+  fs.mkdirSync(path.join(tempDirectory, 'agents'), { recursive: true });
+  fs.writeFileSync(configPath, 'model = "gpt-4.1"\n', 'utf8');
+
+  try {
+    const result = ensureConfigFileExists(configPath);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.path, configPath);
+    assert.equal(result.data.model, 'gpt-4.1');
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
 });
 
 test('writeConfig writes empty <path> custom IDs as explicit tables', () => {

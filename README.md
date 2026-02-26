@@ -1,7 +1,7 @@
 # Codex Configurator
 
 Codex Configurator is a terminal user interface (TUI) built with Node.js, React, and Ink.
-It shows the current contents of a Codex TOML configuration file and can reload it on demand.
+It shows the current contents of Codex TOML configuration files and can edit them inline.
 
 ## Requirements
 
@@ -19,10 +19,10 @@ npm i -g codex-configurator
 codex-configurator
 ```
 
-Optional config-path override:
+Optional workspace override:
 
 ```bash
-codex-configurator --config /path/to/config.toml
+codex-configurator --codex-dir /path/to/workspace
 ```
 
 For local development in this repository:
@@ -42,6 +42,7 @@ npm start
 - `Del`: unset selected value or remove selected custom `<id>` entry from `config.toml`
 - `←` / `Backspace`: move up one level (to parent table)
 - `r`: reload the active config file
+- `f`: switch between TOML config files in the current workspace
 - `q`: quit
 
 The right-hand pane shows what each setting means, plus a picker when a value has preset options.
@@ -80,13 +81,20 @@ By default the app reads from:
 ~/.codex/config.toml
 ```
 
-You can override this path with either:
+You can override the workspace with either:
 
-- CLI: `--config /absolute/or/relative/path.toml`
-- Env: `CODEX_CONFIGURATOR_CONFIG_PATH`
+- CLI: `--codex-dir /absolute/or/relative/path`
+- Env: `CODEX_CONFIGURATOR_CODEX_DIR`
 
 Precedence is CLI first, then environment variable, then the default path.
-If the file is missing or unreadable, the TUI displays the read error and the resolved path.
+The resolved workspace is normalized and `/path/.codex/config.toml` is used as the config file.
+If the active file is missing or unreadable, the TUI displays the read error and resolved path.
+
+The active config file can also be changed at runtime with `f`:
+
+- `main config` is always the resolved workspace main file (`~/.codex/config.toml` by default).
+- each `agents.<name>.config_file` entry contributes an additional editable file.
+  If that file does not exist yet, saving `agents.<name>.config_file` in the main file creates it as an empty TOML file before the main update is written.
 Configuration writes are atomic and create the target file (and parent directories) when missing.
 
 ## Error logging
@@ -128,9 +136,9 @@ This uses the `npm` command from `PATH` (or `CODEX_CONFIGURATOR_NPM_BIN` if set)
 
 ## Scripts
 
-- `npm start`: run the TUI
-- `npm run dev`: same as `npm start`
-- `npm run dev:scratch`: run the TUI against a temporary copy (`.codex-configurator.scratch.toml`) in the project folder
+- `npm run dev`: run the TUI in a temporary workspace (`.codex-configurator.scratch`) without resetting it
+- `npm run dev:reset`: reset the temporary workspace (`.codex-configurator.scratch`) and run the TUI
+- `npm start`: run the TUI directly (no scratch isolation)
 - `npm run lint`: ESLint static analysis for `index.js`, `src`, and `test`
 - `npm run build`: validates the npm package archive (`npm pack --dry-run --ignore-scripts --cache .npm-cache`)
 - `npm test`: runs the Node.js unit test suite (`node --test`)

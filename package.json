@@ -29,8 +29,8 @@
 	},
 	"scripts": {
 		"start": "node index.js",
-		"dev": "node index.js",
-		"dev:scratch": "node scripts/dev-scratch.js",
+		"dev": "node scripts/dev-scratch.js",
+		"dev:reset": "node scripts/dev-scratch.js --reset",
 		"sync:reference": "node scripts/sync-config-reference.js",
 		"lint": "eslint index.js src test --max-warnings=0",
 		"build": "npm pack --dry-run --ignore-scripts --cache .npm-cache",

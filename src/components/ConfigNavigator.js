@@ -274,6 +274,7 @@ export const ConfigNavigator = ({
   editError,
   filterQuery = '',
   isFilterEditing = false,
+  activeConfigFile,
 }) => {
   if (!snapshot.ok) {
     return React.createElement(
@@ -361,6 +362,7 @@ export const ConfigNavigator = ({
     ? getConfigOptionExplanation(hoveredOptionSegments, selectedRow?.key, hoveredOption)
     : null;
   const configHelp = formatConfigHelp(pathSegments, rows[selected]);
+  const configFileHint = `Config file: ${activeConfigFile?.label || 'unknown'} (${activeConfigFile?.path || 'path unavailable'})`;
   const hoveredOptionDescriptionLine = hoveredOptionDescription
     ? React.createElement(
         Text,
@@ -459,23 +461,24 @@ export const ConfigNavigator = ({
       React.createElement(
         Box,
         { flexDirection: 'column', width: rightWidth, marginTop: 1 },
-        rows.length === 0
-          ? React.createElement(
-              React.Fragment,
-              null,
-              String(filterQuery || '').trim().length > 0
-                ? React.createElement(
+            rows.length === 0
+              ? React.createElement(
+                  React.Fragment,
+                  null,
+                  String(filterQuery || '').trim().length > 0
+                    ? React.createElement(
+                        Text,
+                        { color: 'gray' },
+                        `Filter: ${filterQuery} (${rows.length}/${allRows.length})`
+                      )
+                    : null,
+                  React.createElement(Text, { color: 'gray' }, configFileHint),
+                  React.createElement(
                     Text,
                     { color: 'gray' },
-                    `Filter: ${filterQuery} (${rows.length}/${allRows.length})`
-                  )
-                : null,
-              React.createElement(
-                Text,
-                { color: 'gray' },
-                String(filterQuery || '').trim().length > 0
-                  ? 'No selection available. Adjust or clear the filter.'
-                  : 'No selection available.'
+                    String(filterQuery || '').trim().length > 0
+                      ? 'No selection available. Adjust or clear the filter.'
+                      : 'No selection available.'
               )
             )
           : React.createElement(
@@ -499,9 +502,10 @@ export const ConfigNavigator = ({
                     line.showWarningIcon
                       ? React.createElement(Text, { color: 'yellow' }, '[!] ')
                       : null,
-                    line.text
-                  )
+                      line.text
+                    )
                 ),
+              React.createElement(Text, { color: 'gray' }, configFileHint),
               editError ? React.createElement(Text, { color: 'red' }, editError) : null,
               editMode ? React.createElement(Text, { color: 'gray' }, ' ') : null,
               optionSelector,

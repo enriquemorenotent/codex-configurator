@@ -10,7 +10,12 @@ const WORDMARK = [
   ' ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝     ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝',
 ];
 
-export const Header = ({ codexVersion, codexVersionStatus, packageVersion }) =>
+export const Header = ({
+  codexVersion,
+  codexVersionStatus,
+  packageVersion,
+  activeConfigFile,
+}) =>
   React.createElement(
     Box,
     {
@@ -18,16 +23,16 @@ export const Header = ({ codexVersion, codexVersionStatus, packageVersion }) =>
       paddingX: 1,
       marginBottom: 1,
     },
+    React.createElement(
+      Box,
+      { flexDirection: 'row', marginBottom: 1, gap: 0, alignItems: 'flex-end' },
       React.createElement(
         Box,
-        { flexDirection: 'row', marginBottom: 1, gap: 0, alignItems: 'flex-end' },
-        React.createElement(
-          Box,
-          { flexDirection: 'column' },
-          ...WORDMARK.map((line, index) =>
-            React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${index}` }, line)
-          )
-        ),
+        { flexDirection: 'column' },
+        ...WORDMARK.map((line, index) =>
+          React.createElement(Text, { color: 'magentaBright', bold: true, key: `word-${index}` }, line)
+        )
+      ),
       React.createElement(
         Box,
         { marginLeft: 1 },
@@ -49,5 +54,14 @@ export const Header = ({ codexVersion, codexVersionStatus, packageVersion }) =>
             )
           : React.createElement(Text, { color: 'gray' }, ` (${codexVersionStatus})`)
         : null
+    ),
+    React.createElement(
+      Box,
+      { marginTop: 1 },
+      React.createElement(
+        Text,
+        { color: 'gray' },
+        `Active file: ${activeConfigFile?.label || 'unknown'} (${activeConfigFile?.path || 'path unavailable'})`
+      )
     )
   );

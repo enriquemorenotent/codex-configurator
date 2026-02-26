@@ -15,10 +15,11 @@ import {
 } from './configReference.js';
 import { logConfiguratorError } from './errorLogger.js';
 
-export const CONFIG_PATH_ENV_VAR = 'CODEX_CONFIGURATOR_CONFIG_PATH';
-const CONFIG_PATH_FLAG = '--config';
-const DEFAULT_CONFIG_FILE_SEGMENTS = ['.codex', 'config.toml'];
-export const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ...DEFAULT_CONFIG_FILE_SEGMENTS);
+export const WORKSPACE_DIR_ENV_VAR = 'CODEX_CONFIGURATOR_CODEX_DIR';
+const WORKSPACE_DIR_FLAG = '--codex-dir';
+const DEFAULT_WORKSPACE_FILE_SEGMENTS = ['.codex', 'config.toml'];
+const DEFAULT_WORKSPACE_ROOT = os.homedir();
+export const DEFAULT_CONFIG_PATH = path.join(DEFAULT_WORKSPACE_ROOT, ...DEFAULT_WORKSPACE_FILE_SEGMENTS);
 export const MAX_DETAIL_CHARS = 2200;
 const MAX_ARRAY_PREVIEW_ITEMS = 3;
 const MAX_ARRAY_PREVIEW_CHARS = 52;
@@ -103,43 +104,48 @@ const normalizeConfiguredPath = (value, homeDir) => {
   return path.resolve(expanded);
 };
 
-const getCliConfigPath = (argv = process.argv.slice(2)) => {
+const getCliWorkspacePath = (argv = process.argv.slice(2)) => {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = typeof argv[index] === 'string' ? argv[index].trim() : '';
     if (!argument) {
       continue;
     }
 
-    if (argument === CONFIG_PATH_FLAG) {
+    if (argument === WORKSPACE_DIR_FLAG) {
       const nextArgument = argv[index + 1];
       return typeof nextArgument === 'string' ? nextArgument : '';
     }
 
-    if (argument.startsWith(`${CONFIG_PATH_FLAG}=`)) {
-      return argument.slice(CONFIG_PATH_FLAG.length + 1);
+    if (argument.startsWith(`${WORKSPACE_DIR_FLAG}=`)) {
+      return argument.slice(WORKSPACE_DIR_FLAG.length + 1);
     }
   }
 
   return '';
 };
 
-export const resolveConfigPath = ({
+export const resolveWorkspacePath = ({
   argv = process.argv.slice(2),
   env = process.env,
   homeDir = os.homedir(),
 } = {}) => {
-  const cliConfiguredPath = normalizeConfiguredPath(getCliConfigPath(argv), homeDir);
+  const cliConfiguredPath = normalizeConfiguredPath(getCliWorkspacePath(argv), homeDir);
   if (cliConfiguredPath) {
     return cliConfiguredPath;
   }
 
-  const envConfiguredPath = normalizeConfiguredPath(env?.[CONFIG_PATH_ENV_VAR], homeDir);
+  const envConfiguredPath = normalizeConfiguredPath(env?.[WORKSPACE_DIR_ENV_VAR], homeDir);
   if (envConfiguredPath) {
     return envConfiguredPath;
   }
 
-  return path.join(homeDir, ...DEFAULT_CONFIG_FILE_SEGMENTS);
+  return homeDir;
 };
+
+export const resolveConfigPath = (options) => path.join(
+  resolveWorkspacePath(options),
+  ...DEFAULT_WORKSPACE_FILE_SEGMENTS
+);
 
 export const CONFIG_PATH = resolveConfigPath();
 
@@ -158,6 +164,36 @@ export const readConfig = (configPath = CONFIG_PATH) => {
     const targetPath = configPath;
     const errorMessage = error?.message || 'Unable to read or parse configuration file.';
     logConfiguratorError('config.read.failed', {
+      configPath: targetPath,
+      error: errorMessage,
+    });
+
+    return {
+      ok: false,
+      path: targetPath,
+      error: errorMessage,
+    };
+  }
+};
+
+export const ensureConfigFileExists = (configPath = CONFIG_PATH) => {
+  const targetPath = normalizeFilePath(configPath);
+  try {
+    if (!fs.existsSync(targetPath)) {
+      const writeResult = writeConfig({}, targetPath);
+      if (!writeResult.ok) {
+        return {
+          ok: false,
+          path: targetPath,
+          error: writeResult.error || 'Unable to create configuration file.',
+        };
+      }
+    }
+
+    return readConfig(targetPath);
+  } catch (error) {
+    const errorMessage = error?.message || 'Unable to ensure configuration file exists.';
+    logConfiguratorError('config.ensure.failed', {
       configPath: targetPath,
       error: errorMessage,
     });

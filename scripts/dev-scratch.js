@@ -4,16 +4,31 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-const SCRATCH_CONFIG_FILENAME = '.codex-configurator.scratch.toml';
+const SCRATCH_WORKSPACE_NAME = '.codex-configurator.scratch';
+const SCRATCH_CONFIG_FILENAME = 'config.toml';
 
-const getScratchConfigPath = () => path.join(process.cwd(), SCRATCH_CONFIG_FILENAME);
+const getScratchWorkspacePath = () => path.join(process.cwd(), SCRATCH_WORKSPACE_NAME);
+const getScratchConfigPath = () => path.join(
+  getScratchWorkspacePath(),
+  '.codex',
+  SCRATCH_CONFIG_FILENAME
+);
+
+const parseResetFlag = (argv = process.argv.slice(2)) => argv.includes('--reset');
 
 const createScratchConfigFile = (scratchPath) => {
-  fs.writeFileSync(scratchPath, '', 'utf8');
+  fs.mkdirSync(path.dirname(scratchPath), { recursive: true });
+  if (!fs.existsSync(scratchPath)) {
+    fs.writeFileSync(scratchPath, '', 'utf8');
+  }
 };
 
-const runConfiguratorWithScratchConfig = async (scratchConfigPath) => {
-  const child = spawn(process.execPath, [path.resolve(process.cwd(), 'index.js'), '--config', scratchConfigPath], {
+const runConfiguratorWithScratchConfig = async (workspacePath) => {
+  const child = spawn(process.execPath, [
+    path.resolve(process.cwd(), 'index.js'),
+    '--codex-dir',
+    workspacePath,
+  ], {
     stdio: 'inherit',
   });
 
@@ -41,15 +56,18 @@ const getExitCode = ({ code, signal }) => {
 };
 
 const run = async () => {
+  const isReset = parseResetFlag();
+  const workspacePath = getScratchWorkspacePath();
   const filePath = getScratchConfigPath();
+
+  if (isReset) {
+    fs.rmSync(workspacePath, { recursive: true, force: true });
+  }
+
   createScratchConfigFile(filePath);
 
-  try {
-    const result = await runConfiguratorWithScratchConfig(filePath);
-    process.exit(getExitCode(result));
-  } finally {
-    fs.rmSync(filePath, { force: true });
-  }
+  const result = await runConfiguratorWithScratchConfig(workspacePath);
+  process.exit(getExitCode(result));
 };
 
 run().catch((error) => {
