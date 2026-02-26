@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useReducer } from 'react';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -42,6 +42,7 @@ import {
   resolveMixedVariantBackNavigationPath,
   resolveObjectVariantNavigationPath,
 } from './src/variantPresets.js';
+import { APP_STATE_ACTION, appStateReducer, buildInitialAppState } from './src/appState.js';
 import { pathToKey, clamp } from './src/layout.js';
 import {
   isBackspaceKey,
@@ -296,25 +297,62 @@ const App = () => {
   const terminalWidth = stdout?.columns || 100;
   const terminalHeight = stdout?.rows || 24;
 
-  const [snapshot, setSnapshot] = useState(initialMainSnapshot);
-  const [snapshotByFileId, setSnapshotByFileId] = useState({
-    [initialActiveFileId]: initialMainSnapshot,
-  });
-  const [configFileCatalog, setConfigFileCatalog] = useState(initialCatalog);
-  const [activeConfigFileId, setActiveConfigFileId] = useState(initialActiveFileId);
-  const [pathSegments, setPathSegments] = useState([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [selectionByPath, setSelectionByPath] = useState({});
-  const [scrollOffset, setScrollOffset] = useState(0);
-  const [editMode, setEditMode] = useState(null);
-  const [isFileSwitchMode, setIsFileSwitchMode] = useState(false);
-  const [fileSwitchIndex, setFileSwitchIndex] = useState(0);
-  const [editError, setEditError] = useState('');
-  const [filterQuery, setFilterQuery] = useState('');
-  const [isFilterEditing, setIsFilterEditing] = useState(false);
-  const [codexVersion, setCodexVersion] = useState('version loading...');
-  const [codexVersionStatus, setCodexVersionStatus] = useState('');
+  const [state, dispatch] = useReducer(
+    appStateReducer,
+    buildInitialAppState(initialMainSnapshot, initialCatalog, initialActiveFileId)
+  );
+  const setAppState = (key, valueOrUpdater) =>
+    dispatch({
+      type: APP_STATE_ACTION,
+      payload: { key, valueOrUpdater },
+    });
+  const setStateBatch = (updates) => dispatch({ type: APP_STATE_ACTION, payload: { updates } });
+
+  const setSnapshot = (valueOrUpdater) => setAppState('snapshot', valueOrUpdater);
+  const setSnapshotByFileId = (valueOrUpdater) => setAppState('snapshotByFileId', valueOrUpdater);
+  const setConfigFileCatalog = (valueOrUpdater) =>
+    setAppState('configFileCatalog', valueOrUpdater);
+  const setActiveConfigFileId = (valueOrUpdater) =>
+    setAppState('activeConfigFileId', valueOrUpdater);
+  const setPathSegments = (valueOrUpdater) => setAppState('pathSegments', valueOrUpdater);
+  const setSelectedIndex = (valueOrUpdater) => setAppState('selectedIndex', valueOrUpdater);
+  const setSelectionByPath = (valueOrUpdater) => setAppState('selectionByPath', valueOrUpdater);
+  const setScrollOffset = (valueOrUpdater) => setAppState('scrollOffset', valueOrUpdater);
+  const setEditMode = (valueOrUpdater) => setAppState('editMode', valueOrUpdater);
+  const setIsFileSwitchMode = (valueOrUpdater) => setAppState('isFileSwitchMode', valueOrUpdater);
+  const setFileSwitchIndex = (valueOrUpdater) => setAppState('fileSwitchIndex', valueOrUpdater);
+  const setEditError = (valueOrUpdater) => setAppState('editError', valueOrUpdater);
+  const setFilterQuery = (valueOrUpdater) => setAppState('filterQuery', valueOrUpdater);
+  const setIsFilterEditing = (valueOrUpdater) => setAppState('isFilterEditing', valueOrUpdater);
+  const setCodexVersion = (valueOrUpdater) => setAppState('codexVersion', valueOrUpdater);
+  const setCodexVersionStatus = (valueOrUpdater) =>
+    setAppState('codexVersionStatus', valueOrUpdater);
+  const {
+    snapshot,
+    snapshotByFileId,
+    configFileCatalog,
+    activeConfigFileId,
+    pathSegments,
+    selectedIndex,
+    selectionByPath,
+    scrollOffset,
+    editMode,
+    isFileSwitchMode,
+    fileSwitchIndex,
+    editError,
+    filterQuery,
+    isFilterEditing,
+    codexVersion,
+    codexVersionStatus,
+  } = state;
   const { exit } = useApp();
+  const appMode = isFilterEditing
+    ? 'filter'
+    : isFileSwitchMode
+      ? 'file-switch'
+      : editMode
+        ? 'edit'
+        : 'browse';
 
   useEffect(() => {
     let isCancelled = false;
@@ -358,16 +396,22 @@ const App = () => {
       || (fallbackFile.kind === 'agent'
         ? ensureConfigFileExists(fallbackFile.path)
         : readConfig(fallbackFile.path));
-    setActiveConfigFileId(fallbackFile.id);
-    setSnapshotByFileId((previous) => (previous[fallbackFile.id] ? previous : {
-      ...previous,
-      [fallbackFile.id]: fallbackSnapshot,
-    }));
-    setSnapshot(fallbackSnapshot);
-    setPathSegments([]);
-    setSelectedIndex(0);
-    setSelectionByPath({});
-    setScrollOffset(0);
+    setStateBatch({
+      activeConfigFileId: fallbackFile.id,
+      snapshotByFileId: {
+        ...snapshotByFileId,
+        ...(snapshotByFileId[fallbackFile.id]
+          ? {}
+          : {
+            [fallbackFile.id]: fallbackSnapshot,
+          }),
+      },
+      snapshot: fallbackSnapshot,
+      pathSegments: [],
+      selectedIndex: 0,
+      selectionByPath: {},
+      scrollOffset: 0,
+    });
   }, [configFileCatalog, activeConfigFileId, snapshotByFileId]);
 
   useEffect(() => {
@@ -501,14 +545,16 @@ const App = () => {
       return;
     }
 
-    setActiveConfigFileId(nextFileId);
-    setSnapshot(nextSnapshot);
-    setPathSegments([]);
-    setSelectedIndex(0);
-    setScrollOffset(0);
-    setEditMode(null);
-    setIsFileSwitchMode(false);
-    setEditError('');
+    setStateBatch({
+      activeConfigFileId: nextFileId,
+      snapshot: nextSnapshot,
+      pathSegments: [],
+      selectedIndex: 0,
+      scrollOffset: 0,
+      editMode: null,
+      isFileSwitchMode: false,
+      editError: '',
+    });
   };
 
   const beginEditing = (target, targetPath) => {
@@ -591,15 +637,15 @@ const App = () => {
       ? 0
       : clamp(nextSavedIndex, 0, nextRows.length - 1);
 
-    setSelectionByPath((previous) => ({
-      ...previous,
-      [currentPathKey]: safeSelected,
-    }));
-    setPathSegments(nextPath);
-    setSelectedIndex(nextSelected);
-    setScrollOffset(
-      clamp(nextSelected, 0, Math.max(0, nextRows.length - nextViewportHeight))
-    );
+    setStateBatch({
+      selectionByPath: {
+        ...selectionByPath,
+        [currentPathKey]: safeSelected,
+      },
+      pathSegments: nextPath,
+      selectedIndex: nextSelected,
+      scrollOffset: clamp(nextSelected, 0, Math.max(0, nextRows.length - nextViewportHeight)),
+    });
   };
 
   const applyEdit = () => {
@@ -791,9 +837,11 @@ const App = () => {
       return;
     }
 
-    setEditError('');
-    setIsFileSwitchMode(true);
-    setFileSwitchIndex(Math.max(0, configFileCatalog.findIndex((file) => file.id === activeConfigFileId)));
+    setStateBatch({
+      editError: '',
+      isFileSwitchMode: true,
+      fileSwitchIndex: Math.max(0, configFileCatalog.findIndex((file) => file.id === activeConfigFileId)),
+    });
   };
 
   const applyFileSwitch = () => {
@@ -803,14 +851,12 @@ const App = () => {
 
     const nextFile = configFileCatalog[fileSwitchIndex];
     if (!nextFile) {
-      setIsFileSwitchMode(false);
-      setEditError('');
+      setStateBatch({ isFileSwitchMode: false, editError: '' });
       return;
     }
 
     switchConfigFile(nextFile.id);
-    setIsFileSwitchMode(false);
-    setEditError('');
+    setStateBatch({ isFileSwitchMode: false, editError: '' });
   };
 
   const applyBooleanToggle = (target, targetPath) => {
@@ -948,9 +994,11 @@ const App = () => {
       }
 
       if (key.escape || isBackspaceKey(input, key) || key.leftArrow) {
-        setIsFileSwitchMode(false);
-        setFileSwitchIndex(Math.max(0, configFileCatalog.findIndex((file) => file.id === activeConfigFileId)));
-        setEditError('');
+        setStateBatch({
+          isFileSwitchMode: false,
+          fileSwitchIndex: Math.max(0, configFileCatalog.findIndex((file) => file.id === activeConfigFileId)),
+          editError: '',
+        });
         return;
       }
 
@@ -1245,12 +1293,14 @@ const App = () => {
     if (input === 'r') {
       const nextSnapshot = readActiveConfigSnapshot();
       updateActiveSnapshot(nextSnapshot);
-      setPathSegments([]);
-      setSelectedIndex(0);
-      setSelectionByPath({});
-      setScrollOffset(0);
-      setEditMode(null);
-      setEditError('');
+      setStateBatch({
+        pathSegments: [],
+        selectedIndex: 0,
+        selectionByPath: {},
+        scrollOffset: 0,
+        editMode: null,
+        editError: '',
+      });
 
       if (activeConfigFileId === MAIN_CONFIG_FILE_ID) {
         refreshConfigFileCatalog(nextSnapshot);
@@ -1277,19 +1327,20 @@ const App = () => {
       const parentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, backTargetPath);
       const parentRows = buildRows(parentNode, backTargetPath);
       const savedIndex = getSavedIndex(backTargetPath, 0);
-
-      setPathSegments(backTargetPath);
-      setSelectionByPath((previous) => ({
-        ...previous,
-        [currentPathKey]: safeSelected,
-      }));
-
       const parentViewportHeight = computeListViewportHeight(parentRows, terminalHeight);
       const parentSelected = parentRows.length === 0 ? 0 : clamp(savedIndex, 0, parentRows.length - 1);
-      setSelectedIndex(parentSelected);
-      setScrollOffset(clamp(parentSelected, 0, Math.max(0, parentRows.length - parentViewportHeight)));
-      setEditMode(null);
-      setEditError('');
+
+      setStateBatch({
+        pathSegments: backTargetPath,
+        selectionByPath: {
+          ...selectionByPath,
+          [currentPathKey]: safeSelected,
+        },
+        selectedIndex: parentSelected,
+        scrollOffset: clamp(parentSelected, 0, Math.max(0, parentRows.length - parentViewportHeight)),
+        editMode: null,
+        editError: '',
+      });
       return;
     }
   }, { isActive: isInteractive });
@@ -1378,13 +1429,13 @@ const App = () => {
     React.createElement(
       Text,
       { color: 'gray' },
-      isFilterEditing
+      appMode === 'filter'
         ? FILTER_CONTROL_HINT
-        : isFileSwitchMode
+        : appMode === 'file-switch'
           ? FILE_SWITCH_HINT
-          : editMode
+          : appMode === 'edit'
             ? EDIT_CONTROL_HINT
-          : CONTROL_HINT
+            : CONTROL_HINT
     )
   );
 };
