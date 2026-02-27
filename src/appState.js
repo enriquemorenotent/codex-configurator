@@ -1,5 +1,13 @@
 export const APP_STATE_ACTION = 'APP_STATE_ACTION';
 
+export const APP_MODES = {
+  BROWSE: 'browse',
+  FILTER: 'filter',
+  FILE_SWITCH: 'file-switch',
+  EDIT: 'edit',
+  COMMAND: 'command',
+};
+
 export const appStateReducer = (state, action) => {
   if (action.type !== APP_STATE_ACTION) {
     return state;
@@ -52,6 +60,10 @@ export const buildInitialAppState = (initialMainSnapshot, initialCatalog, initia
   editError: '',
   filterQuery: '',
   isFilterEditing: false,
+  isCommandMode: false,
+  commandInput: '',
+  commandMessage: '',
+  showHelp: false,
   codexVersion: 'version loading...',
   codexVersionStatus: '',
 });

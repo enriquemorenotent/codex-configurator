@@ -585,6 +585,8 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
   }
 
   const description = String(schema?.description || '').trim();
+  const hasDefaultValue = schema && Object.prototype.hasOwnProperty.call(schema, 'default');
+  const defaultValue = hasDefaultValue ? schema.default : undefined;
   const typeLabel = overrides.type || getTypeLabel(schema, context);
   const existing = optionsByKey.get(key);
   const enumValues = Array.isArray(schema?.enum)
@@ -605,6 +607,7 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
       enumOptionDescriptions,
       description,
       deprecated: schema?.deprecated === true,
+      defaultValue,
       variantInfo,
     });
     return;
@@ -618,6 +621,9 @@ const addReferenceOption = (optionsByKey, pathSegments, schema, context = {}, ov
     enumOptionDescriptions
   );
   existing.variantInfo = mergeVariantInfo(existing.variantInfo, variantInfo);
+  if (existing.defaultValue === undefined && hasDefaultValue) {
+    existing.defaultValue = defaultValue;
+  }
   if (!existing.description && description) {
     existing.description = description;
   }
@@ -805,6 +811,15 @@ const collectSchemaOptions = (schema, pathSegments, optionsByKey, context) => {
         addReferenceOption(optionsByKey, normalizedPath, { ...normalized }, context);
       }
       return;
+    }
+
+    if (hasProperties && normalizedPath.length > 0) {
+      addReferenceOption(
+        optionsByKey,
+        normalizedPath,
+        { ...normalized, type: 'table' },
+        context
+      );
     }
 
     Object.entries(properties).forEach(([segment, child]) => {

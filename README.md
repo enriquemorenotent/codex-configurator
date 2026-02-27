@@ -2,6 +2,7 @@
 
 Codex Configurator is a terminal user interface (TUI) built with Node.js, React, and Ink.
 It shows the current contents of Codex TOML configuration files and can edit them inline.
+The TUI uses a fixed full-screen shell so row/list geometry does not shift as modes change.
 
 ## Requirements
 
@@ -38,12 +39,14 @@ npm start
 - `PgUp` `PgDn`: move one page up/down
 - `Home` `End`: jump to first/last item
 - `Enter`: open selected table; for mixed scalar/object settings, choose a preset first (object presets open nested settings); for boolean settings, toggle directly; for string settings, open inline input; for other preset values, open picker
-- `/`: start fuzzy filter mode for the current list
 - `Del`: unset selected value or remove selected custom `<id>` entry from `config.toml`
 - `←` / `Backspace`: move up one level (to parent table)
-- `r`: reload the active config file
-- `f`: switch between TOML config files in the current workspace
-- `q`: quit
+- `:`: enter command mode
+- `:filter`: start fuzzy filter mode for the current list
+- `:file`: switch between TOML config files in the current workspace
+- `:reload`: reload the active config file
+- `:help`: toggle quick help overlay
+- `:quit` (or `:q`): quit
 
 The right-hand pane shows what each setting means, plus a picker when a value has preset options.
 Deprecated settings are marked with a `[!]` warning marker; only that marker is highlighted.
@@ -90,7 +93,7 @@ Precedence is CLI first, then environment variable, then the default path.
 The resolved workspace is normalized and `/path/.codex/config.toml` is used as the config file.
 If the active file is missing or unreadable, the TUI displays the read error and resolved path.
 
-The active config file can also be changed at runtime with `f`:
+The active config file can also be changed at runtime with `:file`:
 
 - `main config` is always the resolved workspace main file (`~/.codex/config.toml` by default).
 - each `agents.<name>.config_file` entry contributes an additional editable file.

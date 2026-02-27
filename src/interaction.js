@@ -1,25 +1,69 @@
-export const isBackspaceKey = (input, key) =>
-  key.backspace === true || key.name === 'backspace' || input === '\b' || input === '\u007f';
+const readKeyName = (key) => String(key?.name || '').toLowerCase();
+const readKeySequence = (input, key) => {
+  if (typeof input === 'string' && input.length > 0) {
+    return input;
+  }
 
-export const isDeleteKey = (input, key) =>
-  key.delete === true || key.name === 'delete' || input === '\u001b[3~';
+  return typeof key?.sequence === 'string' ? key.sequence : '';
+};
 
-export const isPageUpKey = (input, key) =>
-  key.pageUp === true || key.name === 'pageup' || key.name === 'page-up' || input === '\u001b[5~';
+const isBackspaceSequence = (sequence) =>
+  sequence === '\b' || sequence === '\u007f';
 
-export const isPageDownKey = (input, key) =>
-  key.pageDown === true || key.name === 'pagedown' || key.name === 'page-down' || input === '\u001b[6~';
+const isForwardDeleteSequence = (sequence) =>
+  sequence === '\u001b[3~' ||
+  (sequence.startsWith('\u001b[3;') && sequence.endsWith('~'));
 
-export const isHomeKey = (input, key) =>
-  key.home === true ||
-  key.name === 'home' ||
-  input === '\u001b[H' ||
-  input === '\u001b[1~' ||
-  input === '\u001bOH';
+export const isBackspaceKey = (input, key) => {
+  const name = readKeyName(key);
+  const sequence = readKeySequence(input, key);
+  const ambiguousDeleteSignal =
+    key?.delete === true &&
+    !isForwardDeleteSequence(sequence) &&
+    (sequence === '' || isBackspaceSequence(sequence));
 
-export const isEndKey = (input, key) =>
-  key.end === true ||
-  key.name === 'end' ||
-  input === '\u001b[F' ||
-  input === '\u001b[4~' ||
-  input === '\u001bOF';
+  return key.backspace === true
+    || name === 'backspace'
+    || isBackspaceSequence(sequence)
+    || ambiguousDeleteSignal;
+};
+
+export const isDeleteKey = (input, key) => {
+  const name = readKeyName(key);
+  const sequence = readKeySequence(input, key);
+
+  return !isBackspaceKey(input, key) &&
+    (name === 'delete' || isForwardDeleteSequence(sequence));
+};
+
+export const isPageUpKey = (input, key) => {
+  const name = readKeyName(key);
+  const sequence = readKeySequence(input, key);
+  return key.pageUp === true || name === 'pageup' || name === 'page-up' || sequence === '\u001b[5~';
+};
+
+export const isPageDownKey = (input, key) => {
+  const name = readKeyName(key);
+  const sequence = readKeySequence(input, key);
+  return key.pageDown === true || name === 'pagedown' || name === 'page-down' || sequence === '\u001b[6~';
+};
+
+export const isHomeKey = (input, key) => {
+  const name = readKeyName(key);
+  const sequence = readKeySequence(input, key);
+  return key.home === true ||
+    name === 'home' ||
+    sequence === '\u001b[H' ||
+    sequence === '\u001b[1~' ||
+    sequence === '\u001bOH';
+};
+
+export const isEndKey = (input, key) => {
+  const name = readKeyName(key);
+  const sequence = readKeySequence(input, key);
+  return key.end === true ||
+    name === 'end' ||
+    sequence === '\u001b[F' ||
+    sequence === '\u001b[4~' ||
+    sequence === '\u001bOF';
+};

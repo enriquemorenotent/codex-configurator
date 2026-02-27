@@ -14,13 +14,20 @@ test('isBackspaceKey matches supported backspace representations', () => {
   assert.equal(isBackspaceKey('', { name: 'backspace' }), true);
   assert.equal(isBackspaceKey('\b', {}), true);
   assert.equal(isBackspaceKey('\u007f', {}), true);
+  assert.equal(isBackspaceKey('', { sequence: '\u007f' }), true);
+  assert.equal(isBackspaceKey('', { delete: true, name: 'delete', sequence: '' }), true);
   assert.equal(isBackspaceKey('x', {}), false);
 });
 
 test('isDeleteKey matches supported delete representations', () => {
-  assert.equal(isDeleteKey('', { delete: true }), true);
+  assert.equal(isDeleteKey('', { delete: true }), false);
   assert.equal(isDeleteKey('', { name: 'delete' }), true);
   assert.equal(isDeleteKey('\u001b[3~', {}), true);
+  assert.equal(isDeleteKey('', { sequence: '\u001b[3~' }), true);
+  assert.equal(isDeleteKey('', { sequence: '\u001b[3;5~' }), true);
+  assert.equal(isDeleteKey('\u007f', { delete: true, name: 'delete' }), false);
+  assert.equal(isDeleteKey('', { delete: true, sequence: '\u007f' }), false);
+  assert.equal(isDeleteKey('', { delete: true, name: 'delete', sequence: '' }), false);
   assert.equal(isDeleteKey('x', {}), false);
 });
 

@@ -1,17 +1,11 @@
 #!/usr/bin/env node
 
-import React, { useEffect, useReducer } from 'react';
+import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import os from 'node:os';
 import { render, useInput, useApp, useStdout, Text, Box } from 'ink';
-import {
-  CONTROL_HINT,
-  EDIT_CONTROL_HINT,
-  FILE_SWITCH_HINT,
-  FILTER_CONTROL_HINT,
-} from './src/constants.js';
 import {
   buildConfigFileCatalog,
   MAIN_CONFIG_FILE_ID,
@@ -42,32 +36,23 @@ import {
   resolveMixedVariantBackNavigationPath,
   resolveObjectVariantNavigationPath,
 } from './src/variantPresets.js';
-import { APP_STATE_ACTION, appStateReducer, buildInitialAppState } from './src/appState.js';
-import { pathToKey, clamp } from './src/layout.js';
+import { APP_MODES, APP_STATE_ACTION, appStateReducer, buildInitialAppState } from './src/appState.js';
 import {
-  isBackspaceKey,
-  isDeleteKey,
-  isPageUpKey,
-  isPageDownKey,
-  isHomeKey,
-  isEndKey,
-} from './src/interaction.js';
+  pathToKey,
+  clamp,
+  computeListViewportRows,
+} from './src/layout.js';
 import { Header } from './src/components/Header.js';
 import { ConfigNavigator } from './src/components/ConfigNavigator.js';
 import { filterRowsByQuery } from './src/fuzzySearch.js';
+import { executeInputCommand, getModeHint } from './src/ui/commands.js';
+import { CommandBar } from './src/ui/panes/CommandBar.js';
+import { HelpBubble } from './src/ui/panes/HelpBubble.js';
+import { LayoutShell } from './src/ui/panes/LayoutShell.js';
+import { StatusLine } from './src/ui/panes/StatusLine.js';
 
 const require = createRequire(import.meta.url);
 const { version: PACKAGE_VERSION = 'unknown' } = require('./package.json');
-
-const computeListViewportHeight = (rows, terminalRows) =>
-  Math.max(4, Math.min(rows.length, Math.min(20, Math.max(4, terminalRows - 14))));
-
-const isBooleanOnlyOptions = (options) =>
-  Array.isArray(options) &&
-  options.length === 2 &&
-  options.every((option) => typeof option === 'boolean') &&
-  options.includes(false) &&
-  options.includes(true);
 
 const isStringReferenceType = (type) => /^string(?:\s|$)/.test(String(type || '').trim());
 
@@ -84,7 +69,6 @@ const isCustomIdTableRow = (pathSegments, row) =>
   typeof row?.pathSegment === 'string' &&
   Boolean(getReferenceCustomIdPlaceholder(pathSegments));
 
-const isInlineTextMode = (mode) => mode === 'text' || mode === 'add-id';
 const VERSION_COMMAND_TIMEOUT_MS = 3000;
 const UPDATE_COMMAND_TIMEOUT_MS = 180000;
 const COMMAND_MAX_BUFFER_BYTES = 1024 * 1024;
@@ -92,6 +76,17 @@ const UPDATE_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const CODEX_BIN_ENV_VAR = 'CODEX_CONFIGURATOR_CODEX_BIN';
 const NPM_BIN_ENV_VAR = 'CODEX_CONFIGURATOR_NPM_BIN';
 const CONFIGURATOR_PACKAGE_NAME = 'codex-configurator';
+const FILE_SWITCH_MAX_VISIBLE_ENTRIES = 6;
+const FILE_SWITCH_PANEL_BASE_ROWS = 3;
+const FILE_SWITCH_LAYOUT_EXTRA_GAP_ROWS = 1;
+
+const computeFileSwitchPanelRows = (entryCount) => {
+  const totalEntries = Math.max(0, entryCount);
+  const visibleEntries = Math.min(FILE_SWITCH_MAX_VISIBLE_ENTRIES, totalEntries);
+  const hasOverflow = totalEntries > visibleEntries;
+
+  return FILE_SWITCH_PANEL_BASE_ROWS + visibleEntries + (hasOverflow ? 1 : 0);
+};
 
 const runCommandWithResult = (command, args = [], options = {}) =>
   new Promise((resolve) => {
@@ -294,13 +289,37 @@ const App = () => {
 
   const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
   const { stdout } = useStdout();
-  const terminalWidth = stdout?.columns || 100;
-  const terminalHeight = stdout?.rows || 24;
+  const defaultTerminalWidth = 100;
+  const defaultTerminalHeight = 24;
+  const [terminalSize, setTerminalSize] = useState({
+    width: stdout?.columns || defaultTerminalWidth,
+    height: stdout?.rows || defaultTerminalHeight,
+  });
+  const terminalWidth = terminalSize.width || defaultTerminalWidth;
+  const terminalHeight = terminalSize.height || defaultTerminalHeight;
+
+  useEffect(() => {
+    const handleResize = () => {
+      const nextWidth = process.stdout?.columns || defaultTerminalWidth;
+      const nextHeight = process.stdout?.rows || defaultTerminalHeight;
+      setTerminalSize({
+        width: nextWidth,
+        height: nextHeight,
+      });
+    };
+
+    process.stdout?.on('resize', handleResize);
+    return () => {
+      process.stdout?.off('resize', handleResize);
+    };
+  }, []);
 
   const [state, dispatch] = useReducer(
     appStateReducer,
     buildInitialAppState(initialMainSnapshot, initialCatalog, initialActiveFileId)
   );
+  const commandModeLockRef = useRef(false);
+  const commandInputRef = useRef('');
   const setAppState = (key, valueOrUpdater) =>
     dispatch({
       type: APP_STATE_ACTION,
@@ -312,16 +331,29 @@ const App = () => {
   const setSnapshotByFileId = (valueOrUpdater) => setAppState('snapshotByFileId', valueOrUpdater);
   const setConfigFileCatalog = (valueOrUpdater) =>
     setAppState('configFileCatalog', valueOrUpdater);
-  const setActiveConfigFileId = (valueOrUpdater) =>
-    setAppState('activeConfigFileId', valueOrUpdater);
-  const setPathSegments = (valueOrUpdater) => setAppState('pathSegments', valueOrUpdater);
   const setSelectedIndex = (valueOrUpdater) => setAppState('selectedIndex', valueOrUpdater);
-  const setSelectionByPath = (valueOrUpdater) => setAppState('selectionByPath', valueOrUpdater);
   const setScrollOffset = (valueOrUpdater) => setAppState('scrollOffset', valueOrUpdater);
   const setEditMode = (valueOrUpdater) => setAppState('editMode', valueOrUpdater);
-  const setIsFileSwitchMode = (valueOrUpdater) => setAppState('isFileSwitchMode', valueOrUpdater);
   const setFileSwitchIndex = (valueOrUpdater) => setAppState('fileSwitchIndex', valueOrUpdater);
   const setEditError = (valueOrUpdater) => setAppState('editError', valueOrUpdater);
+  const setCommandMode = (valueOrUpdater) => {
+    const nextValue = typeof valueOrUpdater === 'function'
+      ? Boolean(valueOrUpdater(isCommandMode))
+      : Boolean(valueOrUpdater);
+    commandModeLockRef.current = nextValue;
+    setAppState('isCommandMode', nextValue);
+  };
+  const setCommandInput = (valueOrUpdater) => {
+    const previous = String(commandInputRef.current || '');
+    const resolved = typeof valueOrUpdater === 'function'
+      ? valueOrUpdater(previous)
+      : valueOrUpdater;
+    const next = String(resolved ?? '');
+    commandInputRef.current = next;
+    setAppState('commandInput', next);
+  };
+  const setCommandMessage = (valueOrUpdater) => setAppState('commandMessage', valueOrUpdater);
+  const setShowHelp = (valueOrUpdater) => setAppState('showHelp', valueOrUpdater);
   const setFilterQuery = (valueOrUpdater) => setAppState('filterQuery', valueOrUpdater);
   const setIsFilterEditing = (valueOrUpdater) => setAppState('isFilterEditing', valueOrUpdater);
   const setCodexVersion = (valueOrUpdater) => setAppState('codexVersion', valueOrUpdater);
@@ -342,17 +374,24 @@ const App = () => {
     editError,
     filterQuery,
     isFilterEditing,
+    isCommandMode,
+    commandInput,
+    commandMessage,
+    showHelp,
     codexVersion,
     codexVersionStatus,
   } = state;
+  commandInputRef.current = String(commandInput || '');
   const { exit } = useApp();
   const appMode = isFilterEditing
-    ? 'filter'
-    : isFileSwitchMode
-      ? 'file-switch'
-      : editMode
-        ? 'edit'
-        : 'browse';
+    ? APP_MODES.FILTER
+    : isCommandMode
+      ? APP_MODES.COMMAND
+      : isFileSwitchMode
+        ? APP_MODES.FILE_SWITCH
+        : editMode
+          ? APP_MODES.EDIT
+          : APP_MODES.BROWSE;
 
   useEffect(() => {
     let isCancelled = false;
@@ -442,7 +481,20 @@ const App = () => {
   const allRows = buildRows(currentNode, pathSegments);
   const rows = filterRowsByQuery(allRows, filterQuery);
   const safeSelected = rows.length === 0 ? 0 : Math.min(selectedIndex, rows.length - 1);
-  const listViewportHeight = computeListViewportHeight(rows, terminalHeight);
+  const fileSwitchPanelExtraRows =
+    isInteractive && isFileSwitchMode
+      ? computeFileSwitchPanelRows(configFileCatalog.length) + FILE_SWITCH_LAYOUT_EXTRA_GAP_ROWS
+      : 0;
+  const listViewportHeight = computeListViewportRows({
+    terminalHeight,
+    terminalWidth,
+    activeConfigFile,
+    packageVersion: PACKAGE_VERSION,
+    codexVersion,
+    codexVersionStatus,
+    isInteractive,
+    extraChromeRows: fileSwitchPanelExtraRows,
+  });
   const currentPathKey = `${activeConfigFileId}::${pathToKey(pathSegments)}`;
 
   const getSavedIndex = (segments, fallback = 0) => {
@@ -631,7 +683,16 @@ const App = () => {
       : nextData;
     const nextNode = getNodeAtPath(data, nextPath);
     const nextRows = buildRows(nextNode, nextPath);
-    const nextViewportHeight = computeListViewportHeight(nextRows, terminalHeight);
+    const nextViewportHeight = computeListViewportRows({
+      terminalHeight,
+      terminalWidth,
+      activeConfigFile,
+      packageVersion: PACKAGE_VERSION,
+      codexVersion,
+      codexVersionStatus,
+      isInteractive,
+      extraChromeRows: fileSwitchPanelExtraRows,
+    });
     const nextSavedIndex = getSavedIndex(nextPath, 0);
     const nextSelected = nextRows.length === 0
       ? 0
@@ -828,6 +889,23 @@ const App = () => {
     setEditMode(null);
   };
 
+  const reloadActiveConfig = () => {
+    const nextSnapshot = readActiveConfigSnapshot();
+    updateActiveSnapshot(nextSnapshot);
+    setStateBatch({
+      pathSegments: [],
+      selectedIndex: 0,
+      selectionByPath: {},
+      scrollOffset: 0,
+      editMode: null,
+      editError: '',
+    });
+
+    if (activeConfigFileId === MAIN_CONFIG_FILE_ID) {
+      refreshConfigFileCatalog(nextSnapshot);
+    }
+  };
+
   const beginFileSwitchMode = () => {
     if (!Array.isArray(configFileCatalog) || configFileCatalog.length === 0) {
       return;
@@ -915,432 +993,71 @@ const App = () => {
   };
 
   useInput((input, key) => {
-    const isTextEditing = isInlineTextMode(editMode?.mode);
-
-    if (isFilterEditing) {
-      if (key.return || key.escape) {
-        setIsFilterEditing(false);
-        return;
-      }
-
-      if ((key.ctrl && key.name === 'u') || input === '\u0015') {
-        setFilterQuery('');
-        return;
-      }
-
-      if (isDeleteKey(input, key) || isBackspaceKey(input, key)) {
-        setFilterQuery((previous) => previous.slice(0, -1));
-        return;
-      }
-
-      if (
-        key.rightArrow ||
-        key.leftArrow ||
-        key.upArrow ||
-        key.downArrow ||
-        isPageUpKey(input, key) ||
-        isPageDownKey(input, key) ||
-        isHomeKey(input, key) ||
-        isEndKey(input, key)
-      ) {
-        return;
-      }
-
-      if (!key.ctrl && !key.meta && input.length > 0) {
-        setFilterQuery((previous) => `${previous}${input}`);
-      }
-      return;
-    }
-
-    if (isFileSwitchMode) {
-      if (input === 'q') {
-        exit();
-        return;
-      }
-
-      if (key.upArrow) {
-        setFileSwitchIndex((previous) => clamp(previous - 1, 0, configFileCatalog.length - 1));
-        return;
-      }
-
-      if (key.downArrow) {
-        setFileSwitchIndex((previous) => clamp(previous + 1, 0, configFileCatalog.length - 1));
-        return;
-      }
-
-      if (isPageUpKey(input, key)) {
-        setFileSwitchIndex((previous) => clamp(previous - listViewportHeight, 0, configFileCatalog.length - 1));
-        return;
-      }
-
-      if (isPageDownKey(input, key)) {
-        setFileSwitchIndex((previous) => clamp(previous + listViewportHeight, 0, configFileCatalog.length - 1));
-        return;
-      }
-
-      if (isHomeKey(input, key)) {
-        setFileSwitchIndex(0);
-        return;
-      }
-
-      if (isEndKey(input, key)) {
-        setFileSwitchIndex(Math.max(0, configFileCatalog.length - 1));
-        return;
-      }
-
-      if (key.return) {
-        applyFileSwitch();
-        return;
-      }
-
-      if (key.escape || isBackspaceKey(input, key) || key.leftArrow) {
-        setStateBatch({
-          isFileSwitchMode: false,
-          fileSwitchIndex: Math.max(0, configFileCatalog.findIndex((file) => file.id === activeConfigFileId)),
-          editError: '',
-        });
-        return;
-      }
-
-      if (isDeleteKey(input, key)) {
-        return;
-      }
-
-      return;
-    }
-
-    if (input === 'q' && !isTextEditing) {
-      exit();
-      return;
-    }
-
-    if (!editMode && !isFileSwitchMode && input === '/') {
-      setIsFilterEditing(true);
-      return;
-    }
-
-    if (editMode) {
-      if (isInlineTextMode(editMode.mode)) {
-        if (key.return) {
-          if (editMode.mode === 'text') {
-            applyTextEdit();
-          } else {
-            applyAddId();
-          }
-          return;
-        }
-
-        if (key.escape) {
-          setEditMode(null);
-          setEditError('');
-          return;
-        }
-
-        if (key.leftArrow || isBackspaceKey(input, key)) {
-          setEditMode(null);
-          setEditError('');
-          return;
-        }
-
-        if (isDeleteKey(input, key)) {
-          setEditMode((previous) => ({
-            ...previous,
-            draftValue: previous.draftValue.slice(0, -1),
-          }));
-          return;
-        }
-
-        if (
-          key.rightArrow ||
-          key.upArrow ||
-          key.downArrow ||
-          isPageUpKey(input, key) ||
-          isPageDownKey(input, key) ||
-          isHomeKey(input, key) ||
-          isEndKey(input, key)
-        ) {
-          return;
-        }
-
-        if (!key.ctrl && !key.meta && input.length > 0) {
-          setEditMode((previous) => ({
-            ...previous,
-            draftValue: `${previous.draftValue}${input}`,
-          }));
-        }
-
-        return;
-      }
-
-      if (key.upArrow) {
-        setEditMode((previous) => ({
-          ...previous,
-          selectedOptionIndex: clamp(previous.selectedOptionIndex - 1, 0, previous.options.length - 1),
-        }));
-        return;
-      }
-
-      if (key.downArrow) {
-        setEditMode((previous) => ({
-          ...previous,
-          selectedOptionIndex: clamp(previous.selectedOptionIndex + 1, 0, previous.options.length - 1),
-        }));
-        return;
-      }
-
-      if (isPageUpKey(input, key)) {
-        setEditMode((previous) => ({
-          ...previous,
-          selectedOptionIndex: clamp(
-            previous.selectedOptionIndex - listViewportHeight,
-            0,
-            previous.options.length - 1
-          ),
-        }));
-        return;
-      }
-
-      if (isPageDownKey(input, key)) {
-        setEditMode((previous) => ({
-          ...previous,
-          selectedOptionIndex: clamp(
-            previous.selectedOptionIndex + listViewportHeight,
-            0,
-            previous.options.length - 1
-          ),
-        }));
-        return;
-      }
-
-      if (isHomeKey(input, key)) {
-        setEditMode((previous) => ({
-          ...previous,
-          selectedOptionIndex: 0,
-        }));
-        return;
-      }
-
-      if (isEndKey(input, key)) {
-        setEditMode((previous) => ({
-          ...previous,
-          selectedOptionIndex: Math.max(0, previous.options.length - 1),
-        }));
-        return;
-      }
-
-      if (key.return) {
-        if (editMode.mode === 'variant-select') {
-          applyVariantEdit();
-          return;
-        }
-
-        applyEdit();
-        return;
-      }
-
-      if (key.leftArrow || isBackspaceKey(input, key)) {
-        setEditMode(null);
-        setEditError('');
-        return;
-      }
-
-      if (isDeleteKey(input, key)) {
-        return;
-      }
-
-      if (key.escape) {
-        setEditMode(null);
-        setEditError('');
-        return;
-      }
-    }
-
-    if (key.upArrow) {
-      if (rows.length === 0) {
-        return;
-      }
-
-      setSelectedIndex((previous) => {
-        const next = Math.max(previous - 1, 0);
-        adjustScrollForSelection(next, listViewportHeight, rows.length);
-        return next;
-      });
-      return;
-    }
-
-    if (key.downArrow) {
-      if (rows.length === 0) {
-        return;
-      }
-
-      setSelectedIndex((previous) => {
-        const next = Math.min(previous + 1, rows.length - 1);
-        adjustScrollForSelection(next, listViewportHeight, rows.length);
-        return next;
-      });
-      return;
-    }
-
-    if (isPageUpKey(input, key)) {
-      if (rows.length === 0) {
-        return;
-      }
-
-      setSelectedIndex((previous) => {
-        const next = Math.max(previous - listViewportHeight, 0);
-        adjustScrollForSelection(next, listViewportHeight, rows.length);
-        return next;
-      });
-      return;
-    }
-
-    if (isPageDownKey(input, key)) {
-      if (rows.length === 0) {
-        return;
-      }
-
-      setSelectedIndex((previous) => {
-        const next = Math.min(previous + listViewportHeight, rows.length - 1);
-        adjustScrollForSelection(next, listViewportHeight, rows.length);
-        return next;
-      });
-      return;
-    }
-
-    if (isHomeKey(input, key)) {
-      if (rows.length === 0) {
-        return;
-      }
-
-      setSelectedIndex(0);
-      adjustScrollForSelection(0, listViewportHeight, rows.length);
-      return;
-    }
-
-    if (isEndKey(input, key)) {
-      if (rows.length === 0) {
-        return;
-      }
-
-      const next = rows.length - 1;
-      setSelectedIndex(next);
-      adjustScrollForSelection(next, listViewportHeight, rows.length);
-      return;
-    }
-
-    if (key.return && rows[safeSelected]) {
-      const target = rows[safeSelected];
-
-      if (target.kind === 'action' && target.action === 'add-custom-id') {
-        beginAddIdEditing(pathSegments, target.placeholder || 'id');
-        return;
-      }
-
-      const targetPath = [...pathSegments, target.pathSegment];
-      const variantMeta =
-        typeof target.pathSegment !== 'undefined' &&
-        target.pathSegment !== null &&
-        typeof target.key === 'string'
-          ? getConfigVariantMeta(pathSegments, target.key)
-          : null;
-      if (variantMeta?.kind === 'scalar_object') {
-        beginVariantEditing(target, targetPath, variantMeta);
-        return;
-      }
-
-      if (target.kind === 'table' || target.kind === 'tableArray') {
-        openPathView(targetPath);
-        return;
-      }
-
-      const options = getConfigOptions(targetPath, target.key, target.value, target.kind) || [];
-      if (typeof target.value === 'boolean' || isBooleanOnlyOptions(options)) {
-        applyBooleanToggle(
-          typeof target.value === 'boolean'
-            ? target
-            : { ...target, value: false },
-          targetPath
-        );
-        return;
-      }
-
-      if (options.length > 0) {
-        beginEditing(target, targetPath);
-        return;
-      }
-
-      if (isStringField(targetPath, target.value)) {
-        beginTextEditing(target, targetPath);
-      }
-      return;
-    }
-
-    if (isDeleteKey(input, key) && rows[safeSelected]) {
-      const target = rows[safeSelected];
-      const isValueRow = target.kind === 'value';
-      const isCustomIdRow = isCustomIdTableRow(pathSegments, target);
-      const isInsideArray = Array.isArray(currentNode);
-
-      if ((!isValueRow && !isCustomIdRow) || isInsideArray) {
-        return;
-      }
-
-      const targetPath = [...pathSegments, target.pathSegment];
-      unsetValueAtPath(targetPath);
-      return;
-    }
-
-    if (input === 'r') {
-      const nextSnapshot = readActiveConfigSnapshot();
-      updateActiveSnapshot(nextSnapshot);
-      setStateBatch({
-        pathSegments: [],
-        selectedIndex: 0,
-        selectionByPath: {},
-        scrollOffset: 0,
-        editMode: null,
-        editError: '',
-      });
-
-      if (activeConfigFileId === MAIN_CONFIG_FILE_ID) {
-        refreshConfigFileCatalog(nextSnapshot);
-      }
-
-      return;
-    }
-
-    if (input === 'f' && !editMode && !isFileSwitchMode) {
-      beginFileSwitchMode();
-      return;
-    }
-
-    if (key.leftArrow || isBackspaceKey(input, key) || key.escape) {
-      if (pathSegments.length === 0) {
-        return;
-      }
-
-      const fallbackParentPath = pathSegments.slice(0, -1);
-      const backTargetPath = resolveMixedVariantBackNavigationPath({
+    const commandHandled = executeInputCommand({
+      input,
+      key,
+      context: {
+        appMode,
+        isFilterEditing,
+        isFileSwitchMode,
+        isCommandMode,
+        isCommandModeLocked: commandModeLockRef.current,
+        activeConfigFileId,
+        rows,
+        safeSelected,
+        editMode,
+        listViewportHeight,
         pathSegments,
-        resolveVariantMeta: getConfigVariantMeta,
-      }) || fallbackParentPath;
-      const parentNode = getNodeAtPath(snapshot.ok ? snapshot.data : {}, backTargetPath);
-      const parentRows = buildRows(parentNode, backTargetPath);
-      const savedIndex = getSavedIndex(backTargetPath, 0);
-      const parentViewportHeight = computeListViewportHeight(parentRows, terminalHeight);
-      const parentSelected = parentRows.length === 0 ? 0 : clamp(savedIndex, 0, parentRows.length - 1);
+        snapshot,
+        currentNode,
+        terminalHeight,
+        selectionByPath,
+        configFileCatalog,
+        fileSwitchIndex,
+        currentPathKey,
+        clamp,
+        setEditMode,
+        setFileSwitchIndex,
+        setIsFilterEditing,
+        setFilterQuery,
+        setShowHelp,
+        setStateBatch,
+        setSelectedIndex,
+        setCommandMode,
+        setCommandInput,
+        getCommandInput: () => commandInputRef.current,
+        setCommandMessage,
+        setEditError,
+        beginAddIdEditing,
+        beginTextEditing,
+        beginVariantEditing,
+        beginEditing,
+        beginFileSwitchMode,
+        applyFileSwitch,
+        applyTextEdit,
+        applyAddId,
+        applyVariantEdit,
+        applyEdit,
+        applyBooleanToggle,
+        unsetValueAtPath,
+        openPathView,
+        reloadActiveConfig,
+        getConfigOptions: getConfigOptions,
+        getConfigVariantMeta,
+        getNodeAtPath,
+        buildRows,
+        isStringField,
+        isCustomIdTableRow,
+        resolveMixedVariantBackNavigationPath,
+        adjustScrollForSelection,
+        getSavedIndex,
+        readActiveConfigSnapshot,
+        refreshConfigFileCatalog,
+        exit,
+      },
+    });
 
-      setStateBatch({
-        pathSegments: backTargetPath,
-        selectionByPath: {
-          ...selectionByPath,
-          [currentPathKey]: safeSelected,
-        },
-        selectedIndex: parentSelected,
-        scrollOffset: clamp(parentSelected, 0, Math.max(0, parentRows.length - parentViewportHeight)),
-        editMode: null,
-        editError: '',
-      });
+    if (commandHandled) {
       return;
     }
   }, { isActive: isInteractive });
@@ -1355,11 +1072,29 @@ const App = () => {
       return null;
     }
 
+    const totalEntries = configFileCatalog.length;
+    const visibleEntries = Math.min(FILE_SWITCH_MAX_VISIBLE_ENTRIES, totalEntries);
+    const maxStartIndex = Math.max(0, totalEntries - visibleEntries);
+    const startIndex = clamp(
+      fileSwitchIndex - Math.floor(visibleEntries / 2),
+      0,
+      maxStartIndex
+    );
+    const endIndex = Math.min(totalEntries, startIndex + visibleEntries);
+    const visibleFiles = configFileCatalog.slice(startIndex, endIndex);
+    const hasOverflow = totalEntries > visibleEntries;
+
     return React.createElement(
       Box,
-      { marginTop: 1, borderStyle: 'round', borderColor: 'cyan', paddingLeft: 1, flexDirection: 'column' },
+      {
+        borderStyle: 'round',
+        borderColor: 'cyan',
+        paddingX: 1,
+        flexDirection: 'column',
+      },
       React.createElement(Text, { bold: true, color: 'cyan' }, 'File Switch'),
-      ...configFileCatalog.map((file, index) => {
+      ...visibleFiles.map((file, offsetIndex) => {
+        const index = startIndex + offsetIndex;
         const isSelected = index === fileSwitchIndex;
         const isActiveFile = file.id === activeConfigFileId;
         const fileLabel = `${file.label} (${file.kind === 'main' ? 'main' : 'agent'})`;
@@ -1369,12 +1104,25 @@ const App = () => {
             key: file.id,
             color: isSelected ? 'yellow' : isActiveFile ? 'green' : 'gray',
             bold: isSelected,
+            wrap: 'truncate-end',
           },
           `${isSelected ? '› ' : '  '}${fileLabel}${isActiveFile ? ' [active]' : ''}`
         );
-      })
-    );
+      }),
+      hasOverflow
+        ? React.createElement(
+            Text,
+            { color: 'gray', wrap: 'truncate-end', key: 'file-switch-window' },
+            `Showing ${startIndex + 1}-${endIndex} of ${totalEntries}`
+          )
+        : null
+      );
   };
+
+  const commandModeHint = getModeHint({
+    appMode,
+    isCommandMode,
+  });
 
   if (!isInteractive) {
     return React.createElement(
@@ -1385,13 +1133,14 @@ const App = () => {
         codexVersionStatus,
         packageVersion: PACKAGE_VERSION,
         activeConfigFile: activeConfigFile,
+        terminalWidth,
       }),
       React.createElement(ConfigNavigator, {
         snapshot,
         pathSegments,
         selectedIndex: 0,
         terminalWidth,
-        terminalHeight,
+        listViewportHeight,
         scrollOffset: 0,
         editMode: null,
         editError: editError,
@@ -1404,20 +1153,21 @@ const App = () => {
   }
 
   return React.createElement(
-    Box,
-    { flexDirection: 'column', padding: 1 },
-    React.createElement(Header, {
-      codexVersion,
-      codexVersionStatus,
-      packageVersion: PACKAGE_VERSION,
-      activeConfigFile: activeConfigFile,
-    }),
+    LayoutShell,
+    null,
+      React.createElement(Header, {
+        codexVersion,
+        codexVersionStatus,
+        packageVersion: PACKAGE_VERSION,
+        activeConfigFile: activeConfigFile,
+        terminalWidth,
+      }),
     React.createElement(ConfigNavigator, {
       snapshot,
       pathSegments,
       selectedIndex: safeSelected,
       terminalWidth,
-      terminalHeight,
+      listViewportHeight,
       scrollOffset,
       editMode,
       editError,
@@ -1426,17 +1176,30 @@ const App = () => {
       activeConfigFile: activeConfigFile,
     }),
     renderFileSwitchPanel(),
-    React.createElement(
-      Text,
-      { color: 'gray' },
-      appMode === 'filter'
-        ? FILTER_CONTROL_HINT
-        : appMode === 'file-switch'
-          ? FILE_SWITCH_HINT
-          : appMode === 'edit'
-            ? EDIT_CONTROL_HINT
-            : CONTROL_HINT
-    )
+    React.createElement(CommandBar, {
+      appMode,
+      isCommandMode,
+      commandInput,
+      commandMessage,
+      modeHint: commandModeHint,
+    }),
+    React.createElement(StatusLine, {
+      codexVersion,
+      codexVersionStatus,
+      packageVersion: PACKAGE_VERSION,
+      activeConfigFile: activeConfigFile,
+      rowsLength: rows.length,
+      filteredLength: allRows.length,
+      appMode,
+    }),
+    showHelp ? React.createElement(Box, {
+      position: 'absolute',
+      bottom: 3,
+      left: 0,
+      right: 0,
+      marginTop: 0,
+      zIndex: 1,
+    }, React.createElement(HelpBubble, { appMode })) : null
   );
 };
 
