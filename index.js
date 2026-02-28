@@ -79,6 +79,57 @@ const CONFIGURATOR_PACKAGE_NAME = 'codex-configurator';
 const FILE_SWITCH_MAX_VISIBLE_ENTRIES = 6;
 const FILE_SWITCH_PANEL_BASE_ROWS = 3;
 const FILE_SWITCH_LAYOUT_EXTRA_GAP_ROWS = 1;
+const ENABLE_ALT_SCREEN = '\u001b[?1049h';
+const DISABLE_ALT_SCREEN = '\u001b[?1049l';
+const HIDE_CURSOR = '\u001b[?25l';
+const SHOW_CURSOR = '\u001b[?25h';
+const CLEAR_SCREEN = '\u001b[2J';
+const CURSOR_HOME = '\u001b[H';
+
+const supportsFullScreenTerminal = () => Boolean(process.stdout?.isTTY && process.stderr?.isTTY);
+
+const setFullScreenState = (isActive) => {
+  if (!supportsFullScreenTerminal()) {
+    return;
+  }
+
+  if (isActive) {
+    process.stdout.write(`${ENABLE_ALT_SCREEN}${CLEAR_SCREEN}${CURSOR_HOME}${HIDE_CURSOR}`);
+    return;
+  }
+
+  process.stdout.write(`${SHOW_CURSOR}${DISABLE_ALT_SCREEN}`);
+};
+
+const activateTerminalMode = () => {
+  if (!supportsFullScreenTerminal()) {
+    return false;
+  }
+
+  let isActive = true;
+  setFullScreenState(true);
+
+  const restore = () => {
+    if (!isActive) {
+      return;
+    }
+
+    isActive = false;
+    setFullScreenState(false);
+  };
+
+  process.once('exit', restore);
+  process.once('SIGINT', () => {
+    restore();
+    process.exit(130);
+  });
+  process.once('SIGTERM', () => {
+    restore();
+    process.exit(143);
+  });
+
+  return true;
+};
 
 const computeFileSwitchPanelRows = (entryCount) => {
   const totalEntries = Math.max(0, entryCount);
@@ -191,16 +242,77 @@ const normalizeVersion = (value) => {
   return match ? match[1] : '';
 };
 
-const toVersionParts = (value) =>
-  normalizeVersion(value)
-    .split(/[-+._]/)[0]
+const parseVersion = (value) => {
+  const normalized = normalizeVersion(value);
+  const [core, ...suffixParts] = String(normalized || '').split(/[-+]/);
+  const suffix = suffixParts.join('-');
+  const coreParts = core
     .split('.')
     .map((part) => Number.parseInt(part, 10))
     .filter(Number.isFinite);
 
+  return {
+    hasSuffix: Boolean(suffix),
+    suffix,
+    parts: coreParts,
+  };
+};
+
+const comparePreRelease = (leftSuffix, rightSuffix) => {
+  const leftParts = String(leftSuffix || '')
+    .split('.')
+    .filter(Boolean);
+  const rightParts = String(rightSuffix || '')
+    .split('.')
+    .filter(Boolean);
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftPart = leftParts[index];
+    const rightPart = rightParts[index];
+    const leftNumber = Number.parseInt(leftPart, 10);
+    const rightNumber = Number.parseInt(rightPart, 10);
+
+    const leftIsNumber = Number.isFinite(leftNumber);
+    const rightIsNumber = Number.isFinite(rightNumber);
+
+    if (leftIsNumber && rightIsNumber) {
+      if (leftNumber > rightNumber) {
+        return 1;
+      }
+
+      if (leftNumber < rightNumber) {
+        return -1;
+      }
+
+      continue;
+    }
+
+    if (leftIsNumber && !rightIsNumber) {
+      return -1;
+    }
+
+    if (!leftIsNumber && rightIsNumber) {
+      return 1;
+    }
+
+    if ((leftPart || '') > (rightPart || '')) {
+      return 1;
+    }
+
+    if ((leftPart || '') < (rightPart || '')) {
+      return -1;
+    }
+  }
+
+  return 0;
+};
+
 const compareVersions = (left, right) => {
-  const leftParts = toVersionParts(left);
-  const rightParts = toVersionParts(right);
+  const leftVersion = parseVersion(left);
+  const rightVersion = parseVersion(right);
+  const leftParts = leftVersion.parts;
+  const rightParts = rightVersion.parts;
   const maxLength = Math.max(leftParts.length, rightParts.length);
 
   for (let index = 0; index < maxLength; index += 1) {
@@ -214,6 +326,14 @@ const compareVersions = (left, right) => {
     if (a < b) {
       return -1;
     }
+  }
+
+  if (leftVersion.hasSuffix !== rightVersion.hasSuffix) {
+    return leftVersion.hasSuffix ? -1 : 1;
+  }
+
+  if (leftVersion.hasSuffix) {
+    return comparePreRelease(leftVersion.suffix, rightVersion.suffix);
   }
 
   return 0;
@@ -253,7 +373,7 @@ const getCodexUpdateStatus = async () => {
     return {
       installed,
       latest,
-      status: 'update available',
+      status: `update available: ${latest}`,
     };
   }
 
@@ -1129,10 +1249,7 @@ const App = () => {
       Box,
       { flexDirection: 'column', padding: 1 },
       React.createElement(Header, {
-        codexVersion,
-        codexVersionStatus,
         packageVersion: PACKAGE_VERSION,
-        activeConfigFile: activeConfigFile,
         terminalWidth,
       }),
       React.createElement(ConfigNavigator, {
@@ -1156,10 +1273,7 @@ const App = () => {
     LayoutShell,
     null,
       React.createElement(Header, {
-        codexVersion,
-        codexVersionStatus,
         packageVersion: PACKAGE_VERSION,
-        activeConfigFile: activeConfigFile,
         terminalWidth,
       }),
     React.createElement(ConfigNavigator, {
@@ -1186,10 +1300,7 @@ const App = () => {
     React.createElement(StatusLine, {
       codexVersion,
       codexVersionStatus,
-      packageVersion: PACKAGE_VERSION,
-      activeConfigFile: activeConfigFile,
-      rowsLength: rows.length,
-      filteredLength: allRows.length,
+      activeConfigFile,
       appMode,
     }),
     showHelp ? React.createElement(Box, {
@@ -1203,4 +1314,5 @@ const App = () => {
   );
 };
 
+activateTerminalMode();
 render(React.createElement(App));

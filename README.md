@@ -3,6 +3,7 @@
 Codex Configurator is a terminal user interface (TUI) built with Node.js, React, and Ink.
 It shows the current contents of Codex TOML configuration files and can edit them inline.
 The TUI uses a fixed full-screen shell so row/list geometry does not shift as modes change.
+While running, it uses the terminal’s alternate screen buffer so the session is rendered as a full-screen interface without scrollback history during interaction.
 
 ## Requirements
 

@@ -1,32 +1,80 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { formatActiveFileSummary } from '../../layout.js';
 
 export const StatusLine = ({
-  codexVersion,
-  codexVersionStatus,
-  packageVersion,
-  activeConfigFile,
-  rowsLength,
-  filteredLength,
-  appMode,
+	codexVersion,
+	codexVersionStatus,
+	activeConfigFile,
+	appMode,
 }) => {
-  const statusText = codexVersionStatus || 'checking...';
-  const topLine = `v${packageVersion || 'unknown'}  Codex ${codexVersion || 'version unavailable'} (${statusText})  mode:${appMode}`;
-  const bottomLine = `active file: ${activeConfigFile?.label || 'unknown'}  rows ${rowsLength}/${filteredLength}`;
+	const statusText = codexVersionStatus || 'checking...';
+	const isUpToDate = statusText === 'up to date';
+	const isUpdateAvailable =
+		typeof statusText === 'string' &&
+		statusText.startsWith('update available');
+	const statusPrefix = isUpToDate ? '✓' : isUpdateAvailable ? '⚠️' : '';
+	const activeFileSummary = formatActiveFileSummary(activeConfigFile);
 
-  return (
-  React.createElement(
-    Box,
-    { borderStyle: 'single', borderColor: 'gray', paddingX: 1, flexDirection: 'column' },
-    React.createElement(Text, { color: 'gray', wrap: 'truncate-end' }, topLine),
-    React.createElement(
-      Text,
-      {
-        color: 'gray',
-        wrap: 'truncate-end',
-      },
-      bottomLine
-    )
-  )
-  );
+	return React.createElement(
+		Box,
+		{
+			paddingX: 1,
+			paddingY: 0,
+			marginTop: 1,
+			flexDirection: 'row',
+			justifyContent: 'space-between',
+			backgroundColor: 'blue',
+			width: '100%',
+		},
+		React.createElement(
+			Box,
+			{ flexDirection: 'row', gap: 2 },
+			React.createElement(
+				Text,
+				{ color: 'white', backgroundColor: 'magenta', bold: true },
+				` ${appMode.toUpperCase()} `,
+			),
+			React.createElement(
+				Text,
+				{ color: 'white', bold: true },
+				`📝 ${activeFileSummary}`,
+			),
+		),
+
+		React.createElement(
+			Box,
+			{ flexDirection: 'row', gap: 2 },
+			React.createElement(
+				Text,
+				{ color: 'white' },
+				`Codex installed: ${codexVersion || '—'}`,
+			),
+			React.createElement(
+				Box,
+				{ flexDirection: 'row' },
+				statusPrefix
+					? React.createElement(
+							Text,
+							{
+								color: isUpToDate ? 'white' : 'black',
+								backgroundColor: isUpToDate
+									? undefined
+									: 'yellow',
+							},
+							` ${statusPrefix} `,
+						)
+					: null,
+				React.createElement(
+					Text,
+					{
+						color: isUpToDate ? 'white' : 'black',
+						backgroundColor: isUpToDate ? undefined : 'yellow',
+						bold: true,
+					},
+					`${statusText} `,
+				),
+			),
+		),
+	);
 };
