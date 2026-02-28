@@ -8,8 +8,9 @@ const SPLIT_GAP = 2;
 const LEFT_PANE_WIDTH_RATIO = 0.3;
 const MIN_TERMINAL_WIDTH = 58;
 const SHELL_VERTICAL_PADDING = 0;
-const COMMAND_BAR_ROWS = 3; // 2 border + 1 text
-const STATUS_BAR_ROWS = 2; // content 1 + margin 1
+const COMMAND_BAR_ROWS_BROWSE = 3; // 1 text + top/bottom borders
+const COMMAND_BAR_ROWS_COMMAND = 4; // 2 text + top/bottom borders
+const STATUS_BAR_ROWS = 1; // 1 content (no trailing margin needed logically now)
 const HEADER_MARGIN_BOTTOM = 0;
 const NON_INTERACTIVE_POST_LIST_ROWS = 1;
 const NAVIGATOR_FRAME_ROWS = 4;
@@ -27,10 +28,14 @@ export const computeHeaderRows = () => {
 	};
 };
 
-export const computeChromeRows = ({ isInteractive }) => {
+export const computeChromeRows = ({ isInteractive, isCommandMode }) => {
 	const header = computeHeaderRows();
-	const gaps = isInteractive ? 3 : 0;
-	const commandRows = isInteractive ? COMMAND_BAR_ROWS : 0;
+	const gaps = isInteractive ? 1 : 0; // We reduced the margin gaps since components are hugging each other naturally in TUI
+	const commandRows = isInteractive
+		? isCommandMode
+			? COMMAND_BAR_ROWS_COMMAND
+			: COMMAND_BAR_ROWS_BROWSE
+		: 0;
 	const statusRows = isInteractive ? STATUS_BAR_ROWS : 0;
 	const postListRows = isInteractive ? 0 : NON_INTERACTIVE_POST_LIST_ROWS;
 
@@ -49,6 +54,7 @@ export const computeChromeRows = ({ isInteractive }) => {
 export const computeListViewportRows = ({
 	terminalHeight,
 	isInteractive = true,
+	isCommandMode = false,
 	chromeRows,
 	extraChromeRows = 0,
 }) => {
@@ -56,6 +62,7 @@ export const computeListViewportRows = ({
 		chromeRows ||
 		computeChromeRows({
 			isInteractive,
+			isCommandMode,
 		});
 	const availableRows =
 		(terminalHeight || 24) -
